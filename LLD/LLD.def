@@ -1,0 +1,9 @@
+
+;   LLD.def
+;--------------------------------------------------------------------
+EXPORTS
+     DebugExtensionNotify
+     DebugExtensionInitialize
+     DebugExtensionUninitialize
+	 injectdll
+	 help
