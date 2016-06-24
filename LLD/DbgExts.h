@@ -29,16 +29,8 @@ protected:
     IDebugSymbols *m_pDebugSymbols;
     IDebugAdvanced *m_pDebugAdvanced;
     IDebugRegisters *m_pDebugRegisters;
-    CONTEXT m_threadContext;
 
-    virtual void PrepareInjectionContext(CONTEXT *pTempContext, PBYTE injectionBuffer, 
-        size_t dllNameLength, ULONG64 offset) = 0;
-
-    virtual bool IsBreakpointOffsetHit(void) = 0;
-
-    virtual PBYTE GetPayload(void) = 0;
-
-    virtual size_t GetPayloadSize(void) = 0;
+    DWORD m_remoteThreadId;
 
     void SuspendAllThreadsButCurrent(void);
 
@@ -89,31 +81,4 @@ public:
     STDMETHOD(ChangeEngineState)(ULONG Flags, ULONG64 Argument);
 
     STDMETHOD(ChangeSymbolState)(ULONG Flags, ULONG64 Argument);
-};
-
-#if _WIN64
-#define PAYLOAD_SIZE 3
-#else
-#define PAYLOAD_SIZE 4
-#endif
-
-class InjectionControlImpl final : public InjectionControl
-{
-private:
-    static BYTE m_payload[PAYLOAD_SIZE];
-    DWORD64 m_breakOffset;
-
-protected:
-    void PrepareInjectionContext(CONTEXT *pTempContext, PBYTE injectionBuffer, 
-        size_t dllNameLength, ULONG64 offset);
-
-    bool IsBreakpointOffsetHit(void);
-
-    PBYTE GetPayload(void);
-
-    size_t GetPayloadSize(void);
-
-public:
-
-    InjectionControlImpl(IDebugClient *pDebugClient) : InjectionControl(pDebugClient) {}
 };

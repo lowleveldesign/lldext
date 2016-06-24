@@ -10,7 +10,7 @@ HRESULT CALLBACK injectdll(IDebugClient* pDebugClient, PCSTR args)
             pDebugControl->Release();
             return S_OK;
         }
-        InjectionControl *pInjectionEngine = new InjectionControlImpl(pDebugClient);
+        InjectionControl *pInjectionEngine = new InjectionControl(pDebugClient);
         pInjectionEngine->Inject(args);
 
         pDebugControl->Release();
@@ -39,7 +39,6 @@ InjectionControl::~InjectionControl(void)
     m_pDebugRegisters->Release();
 }
 
-// IUnknown.
 STDMETHODIMP InjectionControl::QueryInterface(REFIID interfaceId, PVOID* instance)
 {
     if (interfaceId == __uuidof(IUnknown) || interfaceId == __uuidof(IDebugEventCallbacks)) {
@@ -52,24 +51,22 @@ STDMETHODIMP InjectionControl::QueryInterface(REFIID interfaceId, PVOID* instanc
     }
 }
 
+STDMETHODIMP_(ULONG) InjectionControl::AddRef() { return S_OK; }
+
+STDMETHODIMP_(ULONG) InjectionControl::Release() { return S_OK; }
+
 void InjectionControl::SuspendAllThreadsButCurrent(void)
 {
     m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "~*n", DEBUG_EXECUTE_NOT_LOGGED);
-    m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "~m", DEBUG_EXECUTE_NOT_LOGGED);
 }
 
 void InjectionControl::ResumeAllThreads(void)
 {
-    m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "~n", DEBUG_EXECUTE_NOT_LOGGED);
     m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "~*m", DEBUG_EXECUTE_NOT_LOGGED);
 }
 
 void InjectionControl::Inject(PCSTR dllName)
 {
-    SuspendAllThreadsButCurrent();
-
-    m_pDebugAdvanced->GetThreadContext(&m_threadContext, sizeof(CONTEXT));
-
     ULONG64 hProcess;
 
     // find the LoadLibrary function (on Win7 we need to use kernel32, on Win8+ kernelbase)
@@ -83,7 +80,7 @@ void InjectionControl::Inject(PCSTR dllName)
     size_t dllNameLength = strlen(dllName) + 1;
     SIZE_T n;
     // allocate injection buffer
-    PBYTE injectionBuffer = (PBYTE)VirtualAllocEx((HANDLE)hProcess, nullptr, dllNameLength + GetPayloadSize(),
+    PBYTE injectionBuffer = (PBYTE)VirtualAllocEx((HANDLE)hProcess, nullptr, dllNameLength,
         MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (!injectionBuffer) {
         throw ::Exception(HRESULT_FROM_WIN32(GetLastError()));
@@ -91,15 +88,11 @@ void InjectionControl::Inject(PCSTR dllName)
     if (!WriteProcessMemory((HANDLE)hProcess, injectionBuffer, dllName, dllNameLength, &n)) {
         throw ::Exception(HRESULT_FROM_WIN32(GetLastError()));
     }
-    if (!WriteProcessMemory((HANDLE)hProcess, injectionBuffer + dllNameLength, GetPayload(), GetPayloadSize(), &n)) {
-        throw ::Exception(HRESULT_FROM_WIN32(GetLastError()));
-    }
 
-    // platform specific settings
-    CONTEXT tempContext;
-    PrepareInjectionContext(&tempContext, injectionBuffer, dllNameLength, offset);
-
-    CheckHResult(m_pDebugAdvanced->SetThreadContext(&tempContext, sizeof(CONTEXT)));
+    HANDLE hThread;
+    hThread = CreateRemoteThread((HANDLE)hProcess, nullptr, 0, (LPTHREAD_START_ROUTINE)offset, 
+        injectionBuffer, 0, &m_remoteThreadId);
+    CloseHandle(hThread);
 
     CheckHResult(m_pDebugClient->SetEventCallbacks(this));
 
@@ -107,14 +100,9 @@ void InjectionControl::Inject(PCSTR dllName)
     CheckHResult(m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "g", DEBUG_EXECUTE_NOT_LOGGED));
 }
 
-STDMETHODIMP_(ULONG) InjectionControl::AddRef() { return S_OK; }
-
-STDMETHODIMP_(ULONG) InjectionControl::Release() { return S_OK; }
-
-
 STDMETHODIMP InjectionControl::GetInterestMask(PULONG Mask)
 {
-    *Mask = DEBUG_EVENT_EXCEPTION;
+    *Mask = DEBUG_EVENT_EXIT_THREAD;
     return S_OK;
 }
 
@@ -125,13 +113,6 @@ STDMETHODIMP InjectionControl::Breakpoint(PDEBUG_BREAKPOINT Bp)
 
 STDMETHODIMP InjectionControl::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
 {
-    if (IsBreakpointOffsetHit()) {
-        m_pDebugAdvanced->SetThreadContext(&m_threadContext, sizeof(CONTEXT));
-        ResumeAllThreads();
-
-        m_pDebugClient->SetEventCallbacks(nullptr);
-        delete this;
-    }
     return DEBUG_STATUS_GO;
 }
 
@@ -140,8 +121,17 @@ STDMETHODIMP InjectionControl::CreateThread(ULONG64 Handle, ULONG64 DataOffset,
 {
     return DEBUG_STATUS_GO;
 }
+
 STDMETHODIMP InjectionControl::ExitThread(ULONG ExitCode)
 {
+    DWORD threadId;
+    CheckHResult(m_pDebugSystemObjects->GetCurrentThreadSystemId(&threadId));
+    if (threadId == m_remoteThreadId) {
+        m_pDebugClient->SetEventCallbacks(nullptr);
+        delete this;
+
+        return DEBUG_STATUS_BREAK;
+    }
     return DEBUG_STATUS_GO;
 }
 
@@ -193,66 +183,3 @@ STDMETHODIMP InjectionControl::ChangeSymbolState(ULONG Flags, ULONG64 Argument)
 {
     return DEBUG_STATUS_NO_CHANGE;
 }
-
-PBYTE InjectionControlImpl::GetPayload(void)
-{
-    return m_payload;
-}
-
-size_t InjectionControlImpl::GetPayloadSize(void)
-{
-    return sizeof(m_payload);
-}
-
-bool InjectionControlImpl::IsBreakpointOffsetHit(void)
-{
-    ULONG64 offset;
-    CheckHResult(m_pDebugRegisters->GetInstructionOffset(&offset));
-
-    return offset == m_breakOffset;
-}
-
-#if _WIN64
-
-/* ********************** x64 **************************** */
-
-// call rax
-// int 3
-BYTE InjectionControlImpl::m_payload[PAYLOAD_SIZE] = { 0xff, 0xD0, 0xCC };
-
-
-void InjectionControlImpl::PrepareInjectionContext(CONTEXT *pTempContext, PBYTE injectionBuffer,
-    size_t dllNameLength, ULONG64 offset)
-{
-    CopyMemory(pTempContext, &m_threadContext, sizeof(CONTEXT));
-    // rax must be set to LoadLibrary address
-    // rcx must be set to the address of the dllname
-    // rip must be set to the address of the code to execute
-    pTempContext->Rax = offset;
-    pTempContext->Rcx = (DWORD64)injectionBuffer;
-    pTempContext->Rip = (DWORD64)(injectionBuffer + dllNameLength);
-    m_breakOffset = (DWORD64)(injectionBuffer + dllNameLength + sizeof(m_payload) - 1);
-}
-
-#else
-
-/* ********************** x86 **************************** */
-
-// call rax
-// int 3
-BYTE InjectionControlImpl::m_payload[PAYLOAD_SIZE] = { 0x51, 0xff, 0xD0, 0xCC };
-
-void InjectionControlImpl::PrepareInjectionContext(CONTEXT *pTempContext, PBYTE injectionBuffer,
-    size_t dllNameLength, ULONG64 offset)
-{
-    CopyMemory(pTempContext, &m_threadContext, sizeof(CONTEXT));
-    // rax must be set to LoadLibrary address
-    // we need to push the dll name on the stack
-    // rip must be set to the address of the code to execute
-    pTempContext->Eax = (DWORD)offset;
-    pTempContext->Ecx = (DWORD)injectionBuffer;
-    pTempContext->Eip = (DWORD)(injectionBuffer + dllNameLength);
-    m_breakOffset = (DWORD)(injectionBuffer + dllNameLength + sizeof(m_payload) - 1);
-}
-
-#endif
