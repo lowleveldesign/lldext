@@ -6,7 +6,7 @@
 #include <strsafe.h>
 
 #define EXT_MAJOR_VER	1
-#define EXT_MINOR_VER	0
+#define EXT_MINOR_VER	1
 
 
 struct Exception
