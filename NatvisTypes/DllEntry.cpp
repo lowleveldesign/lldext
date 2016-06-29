@@ -11,4 +11,6 @@ void test() {
     T7 t7;
     T8 t8;
     T9 t9;
+    NvWchar wc;
+    NvGuid g;
 }
