@@ -29,4 +29,7 @@
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="NatvisTypes.natvis" />
+  </ItemGroup>
 </Project>

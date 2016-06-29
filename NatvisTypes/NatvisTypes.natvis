@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="NvGuid">
+    <DisplayString>{Data1,x}-{Data2,x}-{Data3,x}-{Data4[0]}{Data4[1]}-{Data4[2],x}{Data4[3],x}{Data4[4],x}{Data4[5]}{Data4[6]}{Data4[7]}</DisplayString>
+  </Type>
+  <Type Name="NvWchar">
+    <DisplayString>{c}</DisplayString>
+  </Type>
+</AutoVisualizer>
