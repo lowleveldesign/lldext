@@ -7,6 +7,7 @@
 *.userosscache
 *.sln.docstates
 *.VC.db
+*.VC.VC.opendb
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
