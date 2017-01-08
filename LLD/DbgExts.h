@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <dbgeng.h>
 #include <strsafe.h>
+#include <shlwapi.h>
 
 #define EXT_MAJOR_VER	1
 #define EXT_MINOR_VER	1

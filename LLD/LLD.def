@@ -6,4 +6,5 @@ EXPORTS
      DebugExtensionInitialize
      DebugExtensionUninitialize
 	 injectdll
+	 ufgraph
 	 help

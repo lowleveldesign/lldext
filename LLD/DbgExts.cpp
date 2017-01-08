@@ -4,19 +4,16 @@
 
 
 extern "C" HRESULT CALLBACK
-DebugExtensionInitialize(PULONG Version, PULONG Flags)
-{
+DebugExtensionInitialize(PULONG Version, PULONG Flags) {
     *Version = DEBUG_EXTENSION_VERSION(EXT_MAJOR_VER, EXT_MINOR_VER);
     *Flags = 0;  // Reserved for future use.
     return S_OK;
 }
 
 extern "C" void CALLBACK
-DebugExtensionNotify(ULONG Notify, ULONG64 Argument)
-{
+DebugExtensionNotify(ULONG Notify, ULONG64 Argument) {
     UNREFERENCED_PARAMETER(Argument);
-    switch (Notify)
-    {
+    switch (Notify) {
         // A debugging session is active. The session may not necessarily be suspended.
     case DEBUG_NOTIFY_SESSION_ACTIVE:
         break;
@@ -34,7 +31,6 @@ DebugExtensionNotify(ULONG Notify, ULONG64 Argument)
 }
 
 extern "C" void CALLBACK
-DebugExtensionUninitialize(void)
-{
+DebugExtensionUninitialize(void) {
     return;
 }

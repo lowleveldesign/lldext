@@ -1,8 +1,7 @@
 
 #include "DbgExts.h"
 
-HRESULT CALLBACK injectdll(IDebugClient* pDebugClient, PCSTR args)
-{
+HRESULT CALLBACK injectdll(IDebugClient* pDebugClient, PCSTR args) {
     IDebugControl* pDebugControl;
     if (SUCCEEDED(pDebugClient->QueryInterface(__uuidof(IDebugControl), (void **)&pDebugControl))) {
         if (strlen(args) == 0) {
@@ -18,9 +17,38 @@ HRESULT CALLBACK injectdll(IDebugClient* pDebugClient, PCSTR args)
     return S_OK;
 }
 
+HRESULT CALLBACK ufgraph(IDebugClient *pDebugClient, PCSTR args) {
+    IDebugControl* pDebugControl;
+    if (SUCCEEDED(pDebugClient->QueryInterface(__uuidof(IDebugControl), (void **)&pDebugControl))) {
+        if (strlen(args) == 0) {
+            pDebugControl->Output(DEBUG_OUTPUT_NORMAL, "Address or name of the function to disassemble is required.");
+            pDebugControl->Release();
+            return S_OK;
+        }
+        char path[256];
+        const int MaxPathSize = sizeof(path);
+        if (GetModuleFileNameA(NULL, path, MaxPathSize) == MaxPathSize) {
+            // check if the last error is ERROR_INSUFFICIENT_BUFFER
+            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+                pDebugControl->Output(DEBUG_OUTPUT_NORMAL, "The path to windbg is too long.");
+                pDebugControl->Release();
+                return S_OK;
+            }
+        }
+        PathRemoveFileSpecA(path);
+        if (FAILED(StringCbCatA(path, MaxPathSize, "\\winext\\ufgraph.py"))) {
+            pDebugControl->Output(DEBUG_OUTPUT_NORMAL, "The path with Python script added too long.");
+            pDebugControl->Release();
+            return S_OK;
+        }
+        char buffer[2048];
+        StringCbPrintfA(buffer, sizeof(buffer), ".shell -ci \"uf %s\" python \"%s\"", args, path);
+        pDebugControl->Execute(DEBUG_OUTCTL_THIS_CLIENT, buffer, DEBUG_EXECUTE_DEFAULT);
+    }
+    return S_OK;
+}
 
-InjectionControl::InjectionControl(IDebugClient * pOriginalDebugClient)
-{
+InjectionControl::InjectionControl(IDebugClient * pOriginalDebugClient) {
     CheckHResult(pOriginalDebugClient->CreateClient(&m_pDebugClient));
     CheckHResult(m_pDebugClient->QueryInterface(__uuidof(IDebugControl), (void **)&m_pDebugControl));
     CheckHResult(m_pDebugClient->QueryInterface(__uuidof(IDebugSystemObjects), (void **)&m_pDebugSystemObjects));
@@ -29,8 +57,7 @@ InjectionControl::InjectionControl(IDebugClient * pOriginalDebugClient)
     CheckHResult(m_pDebugClient->QueryInterface(__uuidof(IDebugRegisters), (void **)&m_pDebugRegisters));
 }
 
-InjectionControl::~InjectionControl(void)
-{
+InjectionControl::~InjectionControl(void) {
     m_pDebugClient->Release();
     m_pDebugControl->Release();
     m_pDebugSystemObjects->Release();
@@ -39,8 +66,7 @@ InjectionControl::~InjectionControl(void)
     m_pDebugRegisters->Release();
 }
 
-STDMETHODIMP InjectionControl::QueryInterface(REFIID interfaceId, PVOID* instance)
-{
+STDMETHODIMP InjectionControl::QueryInterface(REFIID interfaceId, PVOID* instance) {
     if (interfaceId == __uuidof(IUnknown) || interfaceId == __uuidof(IDebugEventCallbacks)) {
         *instance = this;
         // No need to refcount as this class is contained.
@@ -55,18 +81,15 @@ STDMETHODIMP_(ULONG) InjectionControl::AddRef() { return S_OK; }
 
 STDMETHODIMP_(ULONG) InjectionControl::Release() { return S_OK; }
 
-void InjectionControl::SuspendAllThreadsButCurrent(void)
-{
+void InjectionControl::SuspendAllThreadsButCurrent(void) {
     m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "~*n", DEBUG_EXECUTE_NOT_LOGGED);
 }
 
-void InjectionControl::ResumeAllThreads(void)
-{
+void InjectionControl::ResumeAllThreads(void) {
     m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "~*m", DEBUG_EXECUTE_NOT_LOGGED);
 }
 
-void InjectionControl::Inject(PCSTR dllName)
-{
+void InjectionControl::Inject(PCSTR dllName) {
     ULONG64 hProcess;
 
     // find the LoadLibrary function (on Win7 we need to use kernel32, on Win8+ kernelbase)
@@ -90,7 +113,7 @@ void InjectionControl::Inject(PCSTR dllName)
     }
 
     HANDLE hThread;
-    hThread = CreateRemoteThread((HANDLE)hProcess, nullptr, 0, (LPTHREAD_START_ROUTINE)offset, 
+    hThread = CreateRemoteThread((HANDLE)hProcess, nullptr, 0, (LPTHREAD_START_ROUTINE)offset,
         injectionBuffer, 0, &m_remoteThreadId);
     CloseHandle(hThread);
 
@@ -100,30 +123,25 @@ void InjectionControl::Inject(PCSTR dllName)
     CheckHResult(m_pDebugControl->Execute(DEBUG_OUTPUT_NORMAL, "g", DEBUG_EXECUTE_NOT_LOGGED));
 }
 
-STDMETHODIMP InjectionControl::GetInterestMask(PULONG Mask)
-{
+STDMETHODIMP InjectionControl::GetInterestMask(PULONG Mask) {
     *Mask = DEBUG_EVENT_EXIT_THREAD;
     return S_OK;
 }
 
-STDMETHODIMP InjectionControl::Breakpoint(PDEBUG_BREAKPOINT Bp)
-{
+STDMETHODIMP InjectionControl::Breakpoint(PDEBUG_BREAKPOINT Bp) {
     return DEBUG_STATUS_GO;
 }
 
-STDMETHODIMP InjectionControl::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance)
-{
+STDMETHODIMP InjectionControl::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance) {
     return DEBUG_STATUS_GO;
 }
 
 STDMETHODIMP InjectionControl::CreateThread(ULONG64 Handle, ULONG64 DataOffset,
-    ULONG64 StartOffset)
-{
+    ULONG64 StartOffset) {
     return DEBUG_STATUS_GO;
 }
 
-STDMETHODIMP InjectionControl::ExitThread(ULONG ExitCode)
-{
+STDMETHODIMP InjectionControl::ExitThread(ULONG ExitCode) {
     DWORD threadId;
     CheckHResult(m_pDebugSystemObjects->GetCurrentThreadSystemId(&threadId));
     if (threadId == m_remoteThreadId) {
@@ -137,49 +155,40 @@ STDMETHODIMP InjectionControl::ExitThread(ULONG ExitCode)
 
 STDMETHODIMP InjectionControl::CreateProcess(ULONG64 ImageFileHandle, ULONG64 Handle, ULONG64 BaseOffset,
     ULONG ModuleSize, PCSTR ModuleName, PCSTR ImageName, ULONG CheckSum, ULONG TimeDateStamp,
-    ULONG64 InitialThreadHandle, ULONG64 ThreadDataOffset, ULONG64 StartOffset)
-{
+    ULONG64 InitialThreadHandle, ULONG64 ThreadDataOffset, ULONG64 StartOffset) {
     return DEBUG_STATUS_GO;
 }
 
-STDMETHODIMP InjectionControl::ExitProcess(ULONG ExitCode)
-{
+STDMETHODIMP InjectionControl::ExitProcess(ULONG ExitCode) {
     return DEBUG_STATUS_GO;
 }
 
 // Any of these values may be zero.
 STDMETHODIMP InjectionControl::LoadModule(ULONG64 ImageFileHandle, ULONG64 BaseOffset, ULONG ModuleSize,
-    PCSTR ModuleName, PCSTR ImageName, ULONG CheckSum, ULONG TimeDateStamp)
-{
+    PCSTR ModuleName, PCSTR ImageName, ULONG CheckSum, ULONG TimeDateStamp) {
     return DEBUG_STATUS_GO;
 }
 
-STDMETHODIMP InjectionControl::UnloadModule(__in_opt PCSTR ImageBaseName, ULONG64 BaseOffset)
-{
+STDMETHODIMP InjectionControl::UnloadModule(__in_opt PCSTR ImageBaseName, ULONG64 BaseOffset) {
     return DEBUG_STATUS_GO;
 }
 
-STDMETHODIMP InjectionControl::SystemError(ULONG Error, ULONG Level)
-{
+STDMETHODIMP InjectionControl::SystemError(ULONG Error, ULONG Level) {
     return DEBUG_STATUS_GO;
 }
 
-STDMETHODIMP InjectionControl::SessionStatus(ULONG Status)
-{
+STDMETHODIMP InjectionControl::SessionStatus(ULONG Status) {
     return DEBUG_STATUS_NO_CHANGE;
 }
 
-STDMETHODIMP InjectionControl::ChangeDebuggeeState(ULONG Flags, ULONG64 Argument)
-{
+STDMETHODIMP InjectionControl::ChangeDebuggeeState(ULONG Flags, ULONG64 Argument) {
     return DEBUG_STATUS_NO_CHANGE;
 }
 
-STDMETHODIMP InjectionControl::ChangeEngineState(ULONG Flags, ULONG64 Argument)
-{
+STDMETHODIMP InjectionControl::ChangeEngineState(ULONG Flags, ULONG64 Argument) {
     return DEBUG_STATUS_NO_CHANGE;
 }
 
-STDMETHODIMP InjectionControl::ChangeSymbolState(ULONG Flags, ULONG64 Argument)
-{
+STDMETHODIMP InjectionControl::ChangeSymbolState(ULONG Flags, ULONG64 Argument) {
     return DEBUG_STATUS_NO_CHANGE;
 }
