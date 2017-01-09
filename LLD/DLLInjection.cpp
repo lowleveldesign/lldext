@@ -17,37 +17,6 @@ HRESULT CALLBACK injectdll(IDebugClient* pDebugClient, PCSTR args) {
     return S_OK;
 }
 
-HRESULT CALLBACK ufgraph(IDebugClient *pDebugClient, PCSTR args) {
-    IDebugControl* pDebugControl;
-    if (SUCCEEDED(pDebugClient->QueryInterface(__uuidof(IDebugControl), (void **)&pDebugControl))) {
-        if (strlen(args) == 0) {
-            pDebugControl->Output(DEBUG_OUTPUT_NORMAL, "Address or name of the function to disassemble is required.");
-            pDebugControl->Release();
-            return S_OK;
-        }
-        char path[256];
-        const int MaxPathSize = sizeof(path);
-        if (GetModuleFileNameA(NULL, path, MaxPathSize) == MaxPathSize) {
-            // check if the last error is ERROR_INSUFFICIENT_BUFFER
-            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                pDebugControl->Output(DEBUG_OUTPUT_NORMAL, "The path to windbg is too long.");
-                pDebugControl->Release();
-                return S_OK;
-            }
-        }
-        PathRemoveFileSpecA(path);
-        if (FAILED(StringCbCatA(path, MaxPathSize, "\\winext\\ufgraph.py"))) {
-            pDebugControl->Output(DEBUG_OUTPUT_NORMAL, "The path with Python script added too long.");
-            pDebugControl->Release();
-            return S_OK;
-        }
-        char buffer[2048];
-        StringCbPrintfA(buffer, sizeof(buffer), ".shell -ci \"uf %s\" python \"%s\"", args, path);
-        pDebugControl->Execute(DEBUG_OUTCTL_THIS_CLIENT, buffer, DEBUG_EXECUTE_DEFAULT);
-    }
-    return S_OK;
-}
-
 InjectionControl::InjectionControl(IDebugClient * pOriginalDebugClient) {
     CheckHResult(pOriginalDebugClient->CreateClient(&m_pDebugClient));
     CheckHResult(m_pDebugClient->QueryInterface(__uuidof(IDebugControl), (void **)&m_pDebugControl));

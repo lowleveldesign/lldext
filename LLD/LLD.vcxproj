@@ -163,6 +163,7 @@
     <ClCompile Include="DbgExts.cpp" />
     <ClCompile Include="DLLInjection.cpp" />
     <ClCompile Include="Shared.cpp" />
+    <ClCompile Include="ufgraph.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DbgExts.h" />
@@ -170,9 +171,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="LLD.def" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="MyExt.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
