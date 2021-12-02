@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31912.275
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lld", "LLD\LLD.vcxproj", "{48707FFA-72CA-4C91-9BBF-932554674D31}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NatvisTypes", "NatvisTypes\NatvisTypes.vcxproj", "{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lldext", "lldext\lldext.vcxproj", "{48707FFA-72CA-4C91-9BBF-932554674D31}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,16 +21,11 @@ Global
 		{48707FFA-72CA-4C91-9BBF-932554674D31}.Release|Win32.Build.0 = Release|Win32
 		{48707FFA-72CA-4C91-9BBF-932554674D31}.Release|x64.ActiveCfg = Release|x64
 		{48707FFA-72CA-4C91-9BBF-932554674D31}.Release|x64.Build.0 = Release|x64
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Debug|Win32.ActiveCfg = Debug|Win32
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Debug|Win32.Build.0 = Debug|Win32
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Debug|x64.ActiveCfg = Debug|x64
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Debug|x64.Build.0 = Debug|x64
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Release|Win32.ActiveCfg = Release|Win32
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Release|Win32.Build.0 = Release|Win32
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Release|x64.ActiveCfg = Release|x64
-		{C05DF892-10CE-4DE3-B8EF-130FB2F6B64C}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FD244702-9054-45F6-8112-A2D1059D1B59}
 	EndGlobalSection
 EndGlobal

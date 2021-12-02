@@ -1,10 +1,10 @@
 
-;   LLD.def
+;   lldext.def
 ;--------------------------------------------------------------------
 EXPORTS
      DebugExtensionNotify
      DebugExtensionInitialize
      DebugExtensionUninitialize
+
 	 injectdll
-	 ufgraph
 	 help
