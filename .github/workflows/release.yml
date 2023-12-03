@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        arch:
+          - x64
+          - x86
+    
+    steps:
+    - uses: actions/checkout@main
+      with:
+        fetch-depth: 1
+        submodules: true
+
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: ${{ matrix.arch }}
+        vsversion: 2022
+
+    - run: |
+        $tagVersions = ([System.IO.Path]::GetFileName("$env:GITHUB_REF") -split "-",0,"SimpleMatch")[0] -split ".",0,"SimpleMatch"
+        $env:LLDEXT_VERSION_MAJOR = $tagVersions[0]
+        $env:LLDEXT_VERSION_MINOR = $tagVersions[1]
+        $today = [DateTime]::Today
+        $env:LLDEXT_VERSION_PATCH = "{0:yy}{1}" -f $today,$today.DayOfYear
+        $env:LLDEXT_VERSION_TWEAK = "$($env:GITHUB_RUN_NUMBER % [int16]::MaxValue)"
+        cmake --preset=ninja-${{ matrix.arch }}-release
+        cmake --build --preset=ninja-${{ matrix.arch }}-release
+      shell: pwsh
+
+    - uses: actions/upload-artifact@main
+      with:
+        name: lldext-${{ matrix.arch }}
+        path: |
+          build/ninja-${{ matrix.arch }}-release/lldext/lldext.dll
+          build/ninja-${{ matrix.arch }}-release/lldext/lldext.pdb

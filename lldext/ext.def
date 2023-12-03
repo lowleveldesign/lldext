@@ -1,0 +1,10 @@
+
+;   lldext.def
+;--------------------------------------------------------------------
+EXPORTS
+     DebugExtensionNotify
+     DebugExtensionInitialize
+     DebugExtensionUninitialize
+
+	 injectdll
+	 help
