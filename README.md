@@ -13,8 +13,9 @@ My WinDbg extension and automation scripts.
     - [callstats \(lldext.js\)](#callstats-lldextjs)
     - [params32 \(lldext.js\)](#params32-lldextjs)
     - [callstacks \(lldext.js\)](#callstacks-lldextjs)
-    - [loadSpyxxTree \(spyxx.js\)](#loadspyxxtree-spyxxjs)
-    - [findWindow \(spyxx.js\)](#findwindow-spyxxjs)
+    - [loadSpyxxTree \(windowing.js\)](#loadspyxxtree-windowingjs)
+    - [loadSystemInformerTree \(windowing.js\)](#loadsysteminformertree-windowingjs)
+    - [findWindow \(windowing.js\)](#findwindow-windowingjs)
 
 <!-- /MarkdownTOC -->
 
@@ -56,22 +57,53 @@ It works with TTD traces and dumps a tree of callstacks that triggered a given f
 FIXME
 ```
 
-### loadSpyxxTree (spyxx.js)
+### loadSpyxxTree (windowing.js)
 
 Parses the window tree (typically in from an sxt file) saved by Spyxx tool. Example usage:
 
 ```shell
-.scriptload spyxx.js
+.scriptload windowing.js
 
 dx @$scriptContents.loadSpyxxTree("C:\\temp\\windows.sxt")
 ```
 
-### findWindow (spyxx.js)
+Example file content:
 
-Retrieves information about a window from a previously loaded Spyxx tree. Example usage:
+```
+Window 00010010 "" #32769 (Desktop)
+    Window 00010100 "" Worker Window
+    Window 00010364 "Default IME" IME
+    Window 00010362 "Microsoft Text Input Application" Windows.UI.Core.CoreWindow
+    Window 00010380 "Default IME" IME
+    Window 0001037E "" ApplicationFrameWindow
+```
+
+### loadSystemInformerTree (windowing.js)
+
+Parses the window tree copied from the System Informer Windows tab for a given process. Example usage:
 
 ```shell
-.scriptload spyxx.js
+.scriptload windowing.js
+
+dx @$scriptContents.loadSpyxxTree("C:\\temp\\windows.txt")
+```
+
+Example file content:
+
+```
+UserAdapterWindowClass, 0x605d4, , iexplore.exe (18168): unnamed thread (16852), CoreMessaging.dll
+CicMarshalWndClass, 0x120442, CicMarshalWnd, iexplore.exe (18168): unnamed thread (16852), msctf.dll
+Isolation Thread Message Window, 0xa01b8, , iexplore.exe (18168): unnamed thread (2824), iexplore.exe
+Isolation Thread Message Window, 0x3068c, , iexplore.exe (18168): unnamed thread (16852), iexplore.exe
+OleMainThreadWndClass, 0x805b6, OleMainThreadWndName, iexplore.exe (18168): unnamed thread (16852), combase.dll
+```
+
+### findWindow (windowing.js)
+
+Retrieves information about a window from a previously loaded Spyxx tree. Example usages:
+
+```shell
+.scriptload windowing.js
 
 dx -g @$cursession.TTD.Calls("patcher!hooked_SetWindowPos").Select(c => new { HWND = c.Parameters.window_handle, Class = @$scriptContents.findWindow(c.Parameters.window_handle).className, Cx = c.Parameters.cx, Cy = c.Parameters.cy, TimeStart = c.TimeStart, Time = c.SystemTimeStart })
 # ================================================================================================================================================
@@ -82,3 +114,7 @@ dx -g @$cursession.TTD.Calls("patcher!hooked_SetWindowPos").Select(c => new { HW
 # = [0x2]              - 0x160046    - tooltips_class32            - 0       - 0      - 2333:253      - Wednesday, March 6, 2024 14:14:19.662    =
 ...
 ``` 
+
+```shell
+bp user32!NtUserSetWindowPos "dx new { function = \"SetWindowPos\", hWnd = (void *)@rcx, class = @$findWindow(@rcx).className, hWndInsertAfter = (void *)@rdx, X = (int)@r8, Y = (int)@r9, cx = *(int *)(@rsp+0x28), cy = *(int *)(@rsp+0x30), uFlags = *(unsigned int *)(@rsp+0x38) }; g"
+```
