@@ -2,13 +2,17 @@
 
 "use strict";
 
+/*
+.scriptunload lldext.js; .scriptload lldext.js
+*/
 
 function initializeScript() {
     return [
         new host.apiVersionSupport(1, 7),
         new host.functionAlias(callstacks, "callstacks"),
         new host.functionAlias(callstats, "callstats"),
-        new host.functionAlias(params32, "params32")
+        new host.functionAlias(params32, "params32"),
+        new host.functionAlias(exceptions, "exceptions"),
     ];
 }
 
@@ -55,6 +59,20 @@ function callstats(functionNameOrAddress) {
 // This function converts the parametrs back to 32-bit values.
 function params32(params64) {
     return params64.SelectMany(p => [p.getLowPart(), p.getHighPart()]);
+}
+
+function exceptions() {
+    return host.currentProcess.TTD.Events.Where(ev => ev.Type === "Exception");
+}
+
+function forEachTimePosition(objects, getTimePosition, action) {
+    const results = new Map(); // Map<TTDTimePosition, T>
+    for (const obj of objects) {
+        const timePosition = getTimePosition(obj);
+        timePosition.SeekTo();
+        results.push(action(obj));
+    }
+    return results;
 }
 
 // ---------------------------------------------------------------------
