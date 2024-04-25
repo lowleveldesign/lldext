@@ -1,14 +1,9 @@
 LLDEXT - WinDbg helpers
 =======================
 
-:point_right: If you're working with WinDbg, check out also [my WinDbg guide](https://wtrace.net/guides/using-windbg/). :point_left:
-
------------------------------
-
-The WinDbg commands implemented in this repository:
-
 <!-- MarkdownTOC -->
 
+- [Tutorials](#tutorials)
 - [Native extension \(lldext.dll\)](#native-extension-lldextdll)
     - [!injectdll](#injectdll)
 - [Helper functions \(lldext.js\)](#helper-functions-lldextjs)
@@ -22,6 +17,14 @@ The WinDbg commands implemented in this repository:
     - [findWindow](#findwindow)
 
 <!-- /MarkdownTOC -->
+
+Tutorials
+---------
+
+My materials covering WinDbg and lldext:
+
+- [WinDbg usage guide](https://wtrace.net/guides/using-windbg/) at <https://wtrace.net>
+- :movie_camera: [Debugging user32 window functions in WinDbg with JavaScript automation](https://youtu.be/lupFi5n7iJk?feature=shared)
 
 Native extension (lldext.dll)
 -----------------------------
