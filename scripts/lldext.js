@@ -51,8 +51,12 @@ function __exec_cmd(s) {
 // ---------------------------------------------------------------------
 
 function callstats(functionNameOrAddress) {
-    return host.currentSession.TTD.Calls(functionNameOrAddress).GroupBy(c => c.Function)
-        .Select(g => { return { Function: g.First().Function, Count: g.Count() }; });
+    return host.currentSession.TTD.Calls(functionNameOrAddress)
+                .GroupBy(c => c.Function === "" ? c.FunctionAddress.toString(16) : c.Function)
+                .Select(g => { return { 
+                    Function: g.First().Function === "" ? g.First().FunctionAddress.toString(16) : g.First().Function,
+                    Count: g.Count()
+                }; });
 }
 
 // Sometimes WinDbg incorrectly decodes the paramters as 64-bit values instead of 32-bit.
