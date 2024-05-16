@@ -5,16 +5,20 @@ LLDEXT - WinDbg helpers
 
 - [Tutorials](#tutorials)
 - [Native extension \(lldext.dll\)](#native-extension-lldextdll)
-    - [!injectdll](#injectdll)
+    - [!injectdll dllPath](#injectdll-dllpath)
 - [Helper functions \(lldext.js\)](#helper-functions-lldextjs)
-    - [callstats](#callstats)
-    - [params32](#params32)
-    - [exceptions](#exceptions)
-    - [callstacks](#callstacks)
-- [Functions to help working with native controls/windows \(windowing.js\)](#functions-to-help-working-with-native-controlswindows-windowingjs)
-    - [loadSpyxxTree](#loadspyxxtree)
-    - [loadSystemInformerTree](#loadsysteminformertree)
-    - [findWindow](#findwindow)
+    - [params32\(params64\)](#params32params64)
+    - [dbgExec\(cmd\)](#dbgexeccmd)
+    - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
+    - [callstats\(functionNameOrAddress\)](#callstatsfunctionnameoraddress)
+    - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
+    - [findEvents\(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition\)](#findeventseventdefition-starttimeposition-mintimeposition-endtimeposition-maxtimeposition)
+    - [forEachEvent\(eventDefition, action, startTimePosition = minTimePosition, endTimePosition = maxTimePosition\)](#foreacheventeventdefition-action-starttimeposition-mintimeposition-endtimeposition-maxtimeposition)
+    - [eventContext\(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition\)](#eventcontexteventdefition-starttimeposition-mintimeposition-endtimeposition-maxtimeposition)
+- [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
+    - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
+    - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
+    - [findWindow\(hwnd\)](#findwindowhwnd)
 
 <!-- /MarkdownTOC -->
 
@@ -29,7 +33,7 @@ My materials covering WinDbg and lldext:
 Native extension (lldext.dll)
 -----------------------------
 
-### !injectdll
+### !injectdll dllPath
 
 Injects DLL into the debuggee
 
@@ -40,7 +44,33 @@ Helper functions (lldext.js)
 
 The scripts folder contains JavaScript scripts. The following commands / functions are available:
 
-### callstats
+### params32(params64)
+
+This function might be useful if WinDbg incorrectly decodes the parameters as 64-bit integers while the target is 32-bit. It sporadically happens when we lack private symbols.
+
+### dbgExec(cmd)
+
+Executes a command in the debugger and returns a list of strings which compose the command's output.
+
+```shell
+dx @$dbgExec("r eax")
+
+# @$dbgExec("r eax")                
+#     [0x0]            : eax=0019715c
+```
+
+### dbgExecAndPrint(cmd)
+
+Executes a command in the debugger and prints the output to the debugger command window.
+
+```shell
+dx @$dbgExecAndPrint("r eax")
+
+# eax=0019715c
+# @$dbgExecAndPrint("r eax")
+```
+
+### callstats(functionNameOrAddress)
 
 It works with TTD traces and prints stats about calls of a given function or functions (wildcards and function addresses are supported), for example:
 
@@ -69,31 +99,7 @@ dx -g @$callstats("kernelbase!*File*")
 # ==============================================================================================================================
 ```
 
-### params32
-
-This function might be useful if WinDbg incorrectly decodes the parameters as 64-bit integers while the target is 32-bit. It sporadically happens when we lack private symbols.
-
-### exceptions
-
-Extracts exceptions from the TTD events. Example:
-
-```shell
-dx -g @$exceptions()
-
-# =============================================================================================================================================================
-# =                                                              = (+) Type     = (+) Position = (+) Exception                                                =
-# =============================================================================================================================================================
-# = [0x0] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 850F:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# = [0x1] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 882A:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# = [0x2] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 88DE:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# = [0x3] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 8936:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# = [0x4] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 89A0:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# = [0x5] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 8B62:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# = [0x6] : Exception 0xE0434352 of type Software at PC: 0X7F... - Exception    - 8D30:0       - Exception 0xE0434352 of type Software at PC: 0X7FF91E0842D0  =
-# =============================================================================================================================================================
-```
-
-### callstacks
+### callstacks(functionNameOrAddress)
 
 It works with TTD traces and dumps a tree of callstacks that triggered a given function. Might be very slow for frequently called functions or when analysing long traces. Example usage:
 
@@ -132,24 +138,68 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 #                                 |- throwexc!__scrt_common_main_seh + 0x10c (0x7ff6bcb812e8)
 #                                   |- KERNEL32!BaseThreadInitThunk + 0x1d (0x7ff91da3257d)
 #                                     |- ntdll!RtlUserThreadStart + 0x28 (0x7ff91e08aa48)
-#       |- hostfxr!`anonymous namespace'::resolve_hostpolicy_version_from_deps + 0x94 (0x7ff910e114e4)
-#         |- hostfxr!hostpolicy_resolver::try_get_dir + 0x104 (0x7ff910e125b4)
-#           |- hostfxr!`anonymous namespace'::get_init_info_for_app + 0x10c3 (0x7ff910e1d833)
-#             |- hostfxr!`anonymous namespace'::read_config_and_execute + 0x7e (0x7ff910e1e03e)
-#               |- hostfxr!fx_muxer_t::handle_exec_host_command + 0x16c (0x7ff910e202ec)
-#                 |- hostfxr!fx_muxer_t::execute + 0x494 (0x7ff910e1e644)
-#                   |- hostfxr!hostfxr_main_startupinfo + 0xa0 (0x7ff910e185a0)
-#                     |- throwexc!exe_start + 0x878 (0x7ff6bcb7f998)
-#                       |- throwexc!wmain + 0x146 (0x7ff6bcb7fda6)
-#                         |- throwexc!invoke_main + 0x22 (0x7ff6bcb812e8)
-#                           |- throwexc!__scrt_common_main_seh + 0x10c (0x7ff6bcb812e8)
-#                             |- KERNEL32!BaseThreadInitThunk + 0x1d (0x7ff91da3257d)
 ```
 
-Functions to help working with native controls/windows (windowing.js)
+### findEvents(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition)
+
+It works with TTD traces and finds events or calls in a specific period of time. The event definition contains the event type and the event value, separated with colon, for example *ld:test.dll*. It is very similar to the old sx- syntax. Supported event types include: ld (module load), ud (module unload), call (function call). If no event type is provided, findEvents assumes you're looking for exceptions with the given exception code. Example usages:
+
+```shell
+# find CreateFileW calls that happened during the main method execution
+dx @$call = @$findEvents("call:myapp!main").First();
+dx -g @$findEvents("call:kernelbase!CreateFileW", @$call.TimeStart, @$call.TimeEnd)
+
+# find all CLR exceptions thrown during the trace collection
+dx -g @$findEvents("clr")
+
+# find the load combase.dll event (the load events are sometimes reported before the minTimePosition)
+dx -g @$findEvents("ld:combase.dll", "0:0")
+```
+
+### forEachEvent(eventDefition, action, startTimePosition = minTimePosition, endTimePosition = maxTimePosition)
+
+It works with TTD traces and executes a given function (action) for each event found in a specific period of time (or full trace). Event definition is the same as described in the **findEvents** documentation. Example usages:
+
+```shell
+# print the paths used in the CreateFileW calls during the main method execution
+dx @$call = @$findEvents("call:myapp!main").First();
+dx -g @$forEachEvent("call:kernelbase!CreateFileW", (ev) => @$dbgExecAndPrint("du poi(@esp + 4)"), @$call.TimeStart, @$call.TimeEnd)
+# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
+# Time Travel Position: 95E3:ADB
+# 00b1b1b0  "C:\test\test.txt"
+```
+
+### eventContext(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition)
+
+It works with TTD traces and creates a search context for events. These is the internal class that both findEvents and forEachEvent functions use. Event definition is the same as described in the **findEvents** documentation. Example usages:
+
+```shell
+dx @$ctx = @$eventContext("call:kernelbase!CreateFileW", @$call.TimeStart, @$call.TimeEnd)
+# @$ctx = @$eventContext("call:kernelbase!CreateFileW", @$call.TimeStart, @$call.TimeEnd)                 : [object Object]
+#     currentEvent     : No current event selected [at lldext (line 141 col 13)]
+#     events          
+#     eventsCount      : 0x8
+
+dx @$ctx.seekNextEvent()
+# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
+# Time Travel Position: 95BE:ADB
+# @$ctx.seekNextEvent() : true
+
+dx @$ctx.seekNextEvent()
+# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
+# Time Travel Position: 95E3:ADB
+# @$ctx.seekNextEvent() : true
+
+dx @$ctx.seekPreviousEvent()
+# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
+# Time Travel Position: 95BE:ADB
+# @$ctx.seekPreviousEvent() : true
+```
+
+Functions helping to recognize native controls/windows (windowing.js)
 ---------------------------------------------------------------------
 
-### loadSpyxxTree
+### loadSpyxxTree(path)
 
 Parses the window tree (typically in from an sxt file) saved by Spyxx tool. Example usage:
 
@@ -170,7 +220,7 @@ Window 00010010 "" #32769 (Desktop)
     Window 0001037E "" ApplicationFrameWindow
 ```
 
-### loadSystemInformerTree
+### loadSystemInformerTree(path)
 
 Parses the window tree copied from the System Informer Windows tab for a given process. Example usage:
 
@@ -190,7 +240,7 @@ Isolation Thread Message Window, 0x3068c, , iexplore.exe (18168): unnamed thread
 OleMainThreadWndClass, 0x805b6, OleMainThreadWndName, iexplore.exe (18168): unnamed thread (16852), combase.dll
 ```
 
-### findWindow
+### findWindow(hwnd)
 
 Retrieves information about a window from a previously loaded Spyxx tree. Example usages:
 
