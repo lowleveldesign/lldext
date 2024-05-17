@@ -12,9 +12,9 @@ LLDEXT - WinDbg helpers
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
     - [callstats\(functionNameOrAddress\)](#callstatsfunctionnameoraddress)
     - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
-    - [findEvents\(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition\)](#findeventseventdefition-starttimeposition-mintimeposition-endtimeposition-maxtimeposition)
-    - [forEachEvent\(eventDefition, action, startTimePosition = minTimePosition, endTimePosition = maxTimePosition\)](#foreacheventeventdefition-action-starttimeposition-mintimeposition-endtimeposition-maxtimeposition)
-    - [eventContext\(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition\)](#eventcontexteventdefition-starttimeposition-mintimeposition-endtimeposition-maxtimeposition)
+    - [findEvents\(eventDefition \[, startTimePosition \[, endTimePosition\]\]\)](#findeventseventdefition-starttimeposition-endtimeposition)
+    - [forEachEvent\(eventDefition, action \[, startTimePosition \[, endTimePosition\]\]\)](#foreacheventeventdefition-action-starttimeposition-endtimeposition)
+    - [eventContext\(eventDefition \[, startTimePosition \[, endTimePosition\]\]\)](#eventcontexteventdefition-starttimeposition-endtimeposition)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -140,7 +140,7 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 #                                     |- ntdll!RtlUserThreadStart + 0x28 (0x7ff91e08aa48)
 ```
 
-### findEvents(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition)
+### findEvents(eventDefition \[, startTimePosition \[, endTimePosition\]\])
 
 It works with TTD traces and finds events or calls in a specific period of time. The event definition contains the event type and the event value, separated with colon, for example *ld:test.dll*. It is very similar to the old sx- syntax. Supported event types include: ld (module load), ud (module unload), call (function call). If no event type is provided, findEvents assumes you're looking for exceptions with the given exception code. Example usages:
 
@@ -156,7 +156,7 @@ dx -g @$findEvents("clr")
 dx -g @$findEvents("ld:combase.dll", "0:0")
 ```
 
-### forEachEvent(eventDefition, action, startTimePosition = minTimePosition, endTimePosition = maxTimePosition)
+### forEachEvent(eventDefition, action \[, startTimePosition \[, endTimePosition\]\])
 
 It works with TTD traces and executes a given function (action) for each event found in a specific period of time (or full trace). Event definition is the same as described in the **findEvents** documentation. Example usages:
 
@@ -169,7 +169,7 @@ dx -g @$forEachEvent("call:kernelbase!CreateFileW", (ev) => @$dbgExecAndPrint("d
 # 00b1b1b0  "C:\test\test.txt"
 ```
 
-### eventContext(eventDefition, startTimePosition = minTimePosition, endTimePosition = maxTimePosition)
+### eventContext(eventDefition \[, startTimePosition \[, endTimePosition\]\])
 
 It works with TTD traces and creates a search context for events. These is the internal class that both findEvents and forEachEvent functions use. Event definition is the same as described in the **findEvents** documentation. Example usages:
 
