@@ -1,6 +1,8 @@
 LLDEXT - WinDbg helpers
 =======================
 
+> :grey_exclamation: The character ^ before parameter name means that the parameter is optional
+
 <!-- MarkdownTOC -->
 
 - [Tutorials](#tutorials)
@@ -12,9 +14,8 @@ LLDEXT - WinDbg helpers
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
     - [callstats\(functionNameOrAddress\)](#callstatsfunctionnameoraddress)
     - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
-    - [findEvents\(eventDefition \[, startTimePosition \[, endTimePosition\]\]\)](#findeventseventdefition-starttimeposition-endtimeposition)
-    - [forEachEvent\(eventDefition, action \[, startTimePosition \[, endTimePosition\]\]\)](#foreacheventeventdefition-action-starttimeposition-endtimeposition)
-    - [eventContext\(eventDefition \[, startTimePosition \[, endTimePosition\]\]\)](#eventcontexteventdefition-starttimeposition-endtimeposition)
+    - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
+    - [jumpTo\(timePosition\)](#jumptotimeposition)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -140,60 +141,24 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 #                                     |- ntdll!RtlUserThreadStart + 0x28 (0x7ff91e08aa48)
 ```
 
-### findEvents(eventDefition \[, startTimePosition \[, endTimePosition\]\])
+### seekAndGet(objects, getTimePosition, func)
 
-It works with TTD traces and finds events or calls in a specific period of time. The event definition contains the event type and the event value, separated with colon, for example *ld:test.dll*. It is very similar to the old sx- syntax. Supported event types include: ld (module load), ud (module unload), call (function call). If no event type is provided, findEvents assumes you're looking for exceptions with the given exception code. Example usages:
+It works with TTD traces and executes a given function (func) for each object after seeking its occurrance. Example usages:
 
 ```shell
-# find CreateFileW calls that happened during the main method execution
-dx @$call = @$findEvents("call:myapp!main").First();
-dx -g @$findEvents("call:kernelbase!CreateFileW", @$call.TimeStart, @$call.TimeEnd)
-
-# find all CLR exceptions thrown during the trace collection
-dx -g @$findEvents("clr")
-
-# find the load combase.dll event (the load events are sometimes reported before the minTimePosition)
-dx -g @$findEvents("ld:combase.dll", "0:0")
+dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$dbgExec("k") })
 ```
 
-### forEachEvent(eventDefition, action \[, startTimePosition \[, endTimePosition\]\])
+### jumpTo(timePosition)
 
-It works with TTD traces and executes a given function (action) for each event found in a specific period of time (or full trace). Event definition is the same as described in the **findEvents** documentation. Example usages:
-
-```shell
-# print the paths used in the CreateFileW calls during the main method execution
-dx @$call = @$findEvents("call:myapp!main").First();
-dx -g @$forEachEvent("call:kernelbase!CreateFileW", (ev) => @$dbgExecAndPrint("du poi(@esp + 4)"), @$call.TimeStart, @$call.TimeEnd)
-# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
-# Time Travel Position: 95E3:ADB
-# 00b1b1b0  "C:\test\test.txt"
-```
-
-### eventContext(eventDefition \[, startTimePosition \[, endTimePosition\]\])
-
-It works with TTD traces and creates a search context for events. These is the internal class that both findEvents and forEachEvent functions use. Event definition is the same as described in the **findEvents** documentation. Example usages:
+Jumps to the time position in a TTD trace. Example usage:
 
 ```shell
-dx @$ctx = @$eventContext("call:kernelbase!CreateFileW", @$call.TimeStart, @$call.TimeEnd)
-# @$ctx = @$eventContext("call:kernelbase!CreateFileW", @$call.TimeStart, @$call.TimeEnd)                 : [object Object]
-#     currentEvent     : No current event selected [at lldext (line 141 col 13)]
-#     events          
-#     eventsCount      : 0x8
+dx @$jumpTo("6DDA9:B6C")
 
-dx @$ctx.seekNextEvent()
-# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
-# Time Travel Position: 95BE:ADB
-# @$ctx.seekNextEvent() : true
-
-dx @$ctx.seekNextEvent()
-# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
-# Time Travel Position: 95E3:ADB
-# @$ctx.seekNextEvent() : true
-
-dx @$ctx.seekPreviousEvent()
-# (2734.2758): Break instruction exception - code 80000003 (first/second chance not available)
-# Time Travel Position: 95BE:ADB
-# @$ctx.seekPreviousEvent() : true
+# (1d88.190c): Break instruction exception - code 80000003 (first/second chance not available)
+# Time Travel Position: 6DDA9:B6C
+# @$jumpTo("6DDA9:B6C")
 ```
 
 Functions helping to recognize native controls/windows (windowing.js)
