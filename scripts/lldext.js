@@ -14,7 +14,6 @@ function initializeScript() {
         new host.functionAlias(params32, "params32"),
         new host.functionAlias(dbgExec, "dbgExec"),
         new host.functionAlias(dbgExecAndPrint, "dbgExecAndPrint"),
-        new host.functionAlias(seekAndRun, "seekAndRun"),
         new host.functionAlias(seekAndGet, "seekAndGet"),
         new host.functionAlias(jumpTo, "jumpTo"),
     ];
@@ -30,6 +29,10 @@ let logLevel = INFO;
 
 function __print(s) {
     host.diagnostics.debugLog(s);
+}
+
+function __println(s) {
+    host.diagnostics.debugLog(`${s}\n`);
 }
 
 function setLogLevel(lvl) {
@@ -61,7 +64,7 @@ function dbgExec(s) {
 function dbgExecAndPrint(s) {
     try {
         for (const line of host.namespace.Debugger.Utility.Control.ExecuteCommand(s)) {
-            __print(line + "\n");
+            __println(line);
         }
     } catch (e) {
         (`failed to execute command: ${s}`);
@@ -72,23 +75,25 @@ function dbgExecAndPrint(s) {
 // Helper functions to work with the time-based debugging objects
 // ---------------------------------------------------------------------
 
-function seekAndRun(objects, getTimePosition, action) {
-    for (const obj of objects) {
-        const timePosition = getTimePosition(obj);
-        timePosition.SeekTo();
-        action(obj);
-    }
+function seekAndGet(objects, getTimePosition, func) {
+    const objectsIter = objects[Symbol.iterator]();
+
+    const iter = {
+        next() {
+            const { value: obj, done } = objectsIter.next();
+            if (!done) {
+                const timePosition = getTimePosition(obj);
+                timePosition.SeekTo();
+                return { value: func(obj), done: false };
+            } else {
+                return { value: undefined, done: true };
+            }
+        },
+        [Symbol.iterator]() { return this; }
+    };
+    return iter;
 }
 
-function seekAndGet(objects, getTimePosition, func) {
-    const results = [];
-    for (const obj of objects) {
-        const timePosition = getTimePosition(obj);
-        timePosition.SeekTo();
-        results.push(func(obj));
-    }
-    return results;
-}
 
 function jumpTo(timePosition) {
     const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));

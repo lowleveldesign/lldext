@@ -143,9 +143,11 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 
 ### seekAndGet(objects, getTimePosition, func)
 
-It works with TTD traces and executes a given function (func) for each object after seeking its occurrance. Example usages:
+It works with TTD traces and executes a given function (func) for each object after setting the time position in the TTD trace. It returns the results of the function call. Example usages:
 
 ```shell
+dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$curstack.Frames })
+
 dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$dbgExec("k") })
 ```
 
