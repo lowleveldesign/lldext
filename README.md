@@ -149,6 +149,9 @@ It works with TTD traces and executes a given function (func) for each object af
 dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$curstack.Frames })
 
 dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$dbgExec("k") })
+
+# group calls to outerHTML property by a given COM class instance
+dx -g @$seekAndGet(@$cursession.TTD.Calls("mshtml!CElement::put_outerHTML"), c => c.TimeStart, c => new { TimeStart = c.TimeStart, Class = **(void ***)(@$curthread.Registers.User.esp + 4) }).GroupBy(t => t.Class).Select(g => new { Class = g.Last().Class, LastCall = g.Last().TimeStart, Count = g.Count() })
 ```
 
 ### jumpTo(timePosition)
