@@ -9,6 +9,7 @@ LLDEXT - WinDbg helpers
 - [Native extension \(lldext.dll\)](#native-extension-lldextdll)
     - [!injectdll dllPath](#injectdll-dllpath)
 - [Helper functions \(lldext.js\)](#helper-functions-lldextjs)
+    - [readString/readWideString\(address, ^length\)](#readstringreadwidestringaddress-length)
     - [params32\(params64\)](#params32params64)
     - [dbgExec\(cmd\)](#dbgexeccmd)
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
@@ -44,6 +45,21 @@ Helper functions (lldext.js)
 ----------------------------
 
 The scripts folder contains JavaScript scripts. The following commands / functions are available:
+
+### readString/readWideString(address, ^length)
+
+Reads an ANSI/UNICODE string from the specific address in the memory.
+
+```shell
+dx -g @$seekAndGet(@$cursession.TTD.Calls("jvm!SystemDictionary::resolve_instance_class_or_null").Skip(0x8a0), c => c.TimeStart, c => new { TimeStart = c.TimeStart, ClassName = @$readString(c.Parameters.class_name->_body, c.Parameters.class_name->_length) })
+
+# ======================================================================================
+# =           = (+) TimeStart = ClassName                                              =
+# ======================================================================================
+# = [0x0]     - 69C72:269     - java/util/concurrent/CopyOnWriteArrayList              =
+# = [0x1]     - 6A31D:4F2     - java/lang/Object                                       =
+# = [0x2]     - 6A333:A1A     - java/util/concurrent/CopyOnWriteArrayList              =
+```
 
 ### params32(params64)
 

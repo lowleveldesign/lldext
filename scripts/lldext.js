@@ -16,6 +16,8 @@ function initializeScript() {
         new host.functionAlias(dbgExecAndPrint, "dbgExecAndPrint"),
         new host.functionAlias(seekAndGet, "seekAndGet"),
         new host.functionAlias(jumpTo, "jumpTo"),
+        new host.functionAlias(readString, "readString"),
+        new host.functionAlias(readWideString, "readWideString"),
     ];
 }
 
@@ -69,6 +71,14 @@ function dbgExecAndPrint(s) {
     } catch (e) {
         (`failed to execute command: ${s}`);
     }
+}
+
+function readString(address, length = undefined) {
+    return length === undefined ? host.memory.readString(address) : host.memory.readString(address, length);
+}
+
+function readWideString(address, length = undefined) {
+    return length === undefined ? host.memory.readWideString(address) : host.memory.readWideString(address, length);
 }
 
 // ---------------------------------------------------------------------
