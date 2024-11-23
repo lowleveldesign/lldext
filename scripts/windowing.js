@@ -3,6 +3,10 @@
 
 "use strict";
 
+/*
+.scriptunload windowing.js; .scriptload windowing.js
+*/
+
 function initializeScript() {
     return [
         new host.apiVersionSupport(1, 7),
@@ -61,7 +65,8 @@ function loadSpyxxTree(path) {
     }
     const re = /Window\s+([0-9A-F]+)\s+"([^"]*)"\s+(.*)$/;
 
-    const reader = fileSystem.CreateTextReader(path, "Utf16");
+    const file = fileSystem.OpenFile(path);
+    const reader = fileSystem.CreateTextReader(file, "Utf16");
     for (const line of reader.ReadLineContents()) {
         const m = re.exec(line);
         if (m) {
@@ -70,6 +75,7 @@ function loadSpyxxTree(path) {
             __windows.set(hwnd, w);
         }
     }
+    file.Close();
 }
 
 function loadSystemInformerTree(path) {
@@ -78,7 +84,8 @@ function loadSystemInformerTree(path) {
         throw new Error(`File not found: ${path}`);
     }
 
-    const reader = fileSystem.CreateTextReader(path, "Utf8");
+    const file = fileSystem.OpenFile(path);
+    const reader = fileSystem.CreateTextReader(file, "Utf8");
     for (const line of reader.ReadLineContents()) {
         const tokens = line.split(",");
         if (tokens => tokens !== null && tokens.length >= 3) {
@@ -87,6 +94,7 @@ function loadSystemInformerTree(path) {
             __windows.set(hwnd, w);
         }
     }
+    file.Close();
 }
 
 function findWindow(hwnd) {

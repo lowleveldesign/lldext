@@ -1,22 +1,22 @@
 LLDEXT - WinDbg helpers
 =======================
 
-> :grey_exclamation: The character ^ before parameter name means that the parameter is optional
-
 <!-- MarkdownTOC -->
 
 - [Tutorials](#tutorials)
 - [Native extension \(lldext.dll\)](#native-extension-lldextdll)
     - [!injectdll dllPath](#injectdll-dllpath)
 - [Helper functions \(lldext.js\)](#helper-functions-lldextjs)
-    - [readString/readWideString\(address, ^length\)](#readstringreadwidestringaddress-length)
+    - [readString/readWideString\(address, length = undefined\)](#readstringreadwidestringaddress-length-undefined)
     - [params32\(params64\)](#params32params64)
     - [dbgExec\(cmd\)](#dbgexeccmd)
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
-    - [callstats\(functionNameOrAddress\)](#callstatsfunctionnameoraddress)
-    - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
-    - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
-    - [jumpTo\(timePosition\)](#jumptotimeposition)
+    - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth = 5\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth-5)
+    - [findAndPrintFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth = 5\)](#findandprintfunctioncallssrcfuncaddr-destfuncaddr-maxdepth-5)
+    - [callstats\(functionNameOrAddress\) / TTD only](#callstatsfunctionnameoraddress-ttd-only)
+    - [callstacks\(functionNameOrAddress\) / TTD only](#callstacksfunctionnameoraddress-ttd-only)
+    - [seekAndGet\(objects, getTimePosition, func\) / TTD only](#seekandgetobjects-gettimeposition-func-ttd-only)
+    - [jumpTo\(timePosition\) / TTD only](#jumptotimeposition-ttd-only)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -46,7 +46,7 @@ Helper functions (lldext.js)
 
 The scripts folder contains JavaScript scripts. The following commands / functions are available:
 
-### readString/readWideString(address, ^length)
+### readString/readWideString(address, length = undefined)
 
 Reads an ANSI/UNICODE string from the specific address in the memory.
 
@@ -87,7 +87,41 @@ dx @$dbgExecAndPrint("r eax")
 # @$dbgExecAndPrint("r eax")
 ```
 
-### callstats(functionNameOrAddress)
+### findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5)
+
+Analyzes assembly code to find call paths between two functions. The **srcFuncAddr** parameter is the memory address of the source function to analyze, and the **destFuncAddr** is a memory address of the target function. The **maxDepth** defines the maximum call path length. It returns an array of call paths, each containnig an array of call addresses.
+
+An example execution, looking for NtCreateFile call paths from CreateFileW:
+
+```shell
+x kernelbase!CreateFileW
+# 00007ffe`4f379e40 KERNELBASE!CreateFileW (CreateFileW)
+
+x ntdll!NtCreateFile
+# 00007ffe`520f0c60 ntdll!NtCreateFile (NtCreateFile)
+
+dx @$findFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
+# ...
+#     length           : 0x2
+#     [0x0]            : [(00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x5f8,(00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77]
+#     [0x1]            : [(00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x589,(00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77]
+```
+
+### findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5)
+
+Similarly to findFunctionCalls finds call paths between two function, but instead of returning them, it prints the call paths in the output:
+
+```shell
+dx @$findAndPrintFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
+#
+# Found calls to (00007ffe`520f0c60)   ntdll!NtCreateFile:
+# |- (00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x5f8
+# | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
+# |- (00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x589
+# | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
+```
+
+### callstats(functionNameOrAddress) / TTD only
 
 It works with TTD traces and prints stats about calls of a given function or functions (wildcards and function addresses are supported), for example:
 
@@ -116,7 +150,7 @@ dx -g @$callstats("kernelbase!*File*")
 # ==============================================================================================================================
 ```
 
-### callstacks(functionNameOrAddress)
+### callstacks(functionNameOrAddress) / TTD only
 
 It works with TTD traces and dumps a tree of callstacks that triggered a given function. Might be very slow for frequently called functions or when analysing long traces. Example usage:
 
@@ -157,7 +191,7 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 #                                     |- ntdll!RtlUserThreadStart + 0x28 (0x7ff91e08aa48)
 ```
 
-### seekAndGet(objects, getTimePosition, func)
+### seekAndGet(objects, getTimePosition, func) / TTD only
 
 It works with TTD traces and executes a given function (func) for each object after setting the time position in the TTD trace. It returns the results of the function call. Example usages:
 
@@ -170,7 +204,7 @@ dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m
 dx -g @$seekAndGet(@$cursession.TTD.Calls("mshtml!CElement::put_outerHTML"), c => c.TimeStart, c => new { TimeStart = c.TimeStart, Class = **(void ***)(@$curthread.Registers.User.esp + 4) }).GroupBy(t => t.Class).Select(g => new { Class = g.Last().Class, LastCall = g.Last().TimeStart, Count = g.Count() })
 ```
 
-### jumpTo(timePosition)
+### jumpTo(timePosition) / TTD only
 
 Jumps to the time position in a TTD trace. Example usage:
 

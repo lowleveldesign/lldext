@@ -12,12 +12,15 @@ function initializeScript() {
         new host.functionAlias(callstacks, "callstacks"),
         new host.functionAlias(callstats, "callstats"),
         new host.functionAlias(params32, "params32"),
+        new host.functionAlias(dbgEval, "dbgEval"),
         new host.functionAlias(dbgExec, "dbgExec"),
         new host.functionAlias(dbgExecAndPrint, "dbgExecAndPrint"),
         new host.functionAlias(seekAndGet, "seekAndGet"),
         new host.functionAlias(jumpTo, "jumpTo"),
         new host.functionAlias(readString, "readString"),
         new host.functionAlias(readWideString, "readWideString"),
+        new host.functionAlias(findFunctionCalls, "findFunctionCalls"),
+        new host.functionAlias(findAndPrintFunctionCalls, "findAndPrintFunctionCalls"),
     ];
 }
 
@@ -51,9 +54,23 @@ function __logn(lvl, s) {
     __log(lvl, s + "\n")
 }
 
+function __is64bit() {
+    return dbgEval("sizeof(void*)") == 8;
+}
+
+function __assert(f, msg = "") {
+    if (!f) {
+        throw new Error(`Assertion error ${msg}`);
+    }
+}
+
 // ---------------------------------------------------------------------
 // Helper functions to work with the debugger
 // ---------------------------------------------------------------------
+
+function dbgEval(v) {
+    return host.evaluateExpression(v);
+}
 
 function dbgExec(s) {
     try {
@@ -79,6 +96,110 @@ function readString(address, length = undefined) {
 
 function readWideString(address, length = undefined) {
     return length === undefined ? host.memory.readWideString(address) : host.memory.readWideString(address, length);
+}
+
+function __resolveAddr(addr) {
+    const rgx = /^\([a-f,\d]+/;
+    return dbgExec(`ln ${addr}`).First(line => rgx.test(line)).split('|')[0].trimEnd();
+}
+
+// ---------------------------------------------------------------------
+// Helper functions to work with assembly
+// ---------------------------------------------------------------------
+
+function findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
+    const srcCallAddr = host.parseInt64(srcFuncAddr, 16); // throws error if srcFuncAddrArg is not a valid Int64 number
+    const destCallAddr = host.parseInt64(destFuncAddr, 16); // throws error if destFuncAddrArg is not a valid Int64 number
+
+    const disasm = host.namespace.Debugger.Utility.Code.CreateDisassembler();
+    const is64bit = __is64bit();
+
+    function getTargetFunctionAddress(operand) {
+        const immediateValue = operand.ImmediateValue;
+        if (operand.Attributes.IsMemoryReference) {
+            var elemSize = is64bit ? 8 : 4;
+            return host.memory.readMemoryValues(immediateValue, 1, elemSize, false)[0];
+        } else if (operand.Attributes.IsImmediate) {
+            return immediateValue;
+        } else {
+            throw new Error("Unsupported attribute");
+        }
+    }
+
+    let callInstructions = disasm.DisassembleFunction(srcCallAddr).BasicBlocks.SelectMany(b => b.Instructions.Where(inst => inst.Attributes.IsCall));
+
+    const callStack = [];
+    for (const callInstruction of callInstructions) {
+        var callTargetAddr = getTargetFunctionAddress(callInstruction.Operands[0]);
+        callStack.push([callTargetAddr, callInstruction.Address, 0]);
+    }
+
+    const foundCallStacks = [];
+    function updateFoundCallStacks() {
+        const foundCallStack = [];
+        let lastDepth = callStack.at(-1)[2] + 1; // depth - +1 to make the first stack to be added
+        for (let i = callStack.length - 1; i >= 0 && lastDepth > 0; i--) {
+            const [_, callAddr, depth] = callStack[i];
+            if (depth < lastDepth) {
+                let resolvedAddr = __resolveAddr(callAddr);
+                foundCallStack.push(resolvedAddr);
+            }
+            lastDepth = depth;
+        }
+        foundCallStacks.push(foundCallStack);
+    }
+
+    let lastDepth = 0;
+    while (callStack.length > 0) {
+        const [funcAddr, _, depth] = callStack.at(-1);
+        const backToParent = depth < lastDepth;
+
+        lastDepth = depth;
+
+        if (backToParent) {
+            callStack.pop();
+            continue;
+        }
+
+        if (funcAddr == destCallAddr) {
+            updateFoundCallStacks();
+            callStack.pop();
+            continue;
+        }
+
+        if (depth + 1 <= maxDepth) {
+            callInstructions = disasm.DisassembleFunction(funcAddr).BasicBlocks.SelectMany(b => b.Instructions.Where(inst => inst.Attributes.IsCall));
+
+            const callStackLength = callStack.length;
+            for (const callInstruction of callInstructions) {
+                const callTargetAddr = getTargetFunctionAddress(callInstruction.Operands[0]);
+                callStack.push([callTargetAddr, callInstruction.Address, depth + 1]);
+            }
+            if (callStackLength == callStack.length) {
+                // no new calls added
+                callStack.pop();
+            }
+        } else {
+            __logn(VERBOSE, "Max stack depth reached.");
+            callStack.pop();
+        }
+    }
+
+    return foundCallStacks;
+}
+
+function findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
+    const foundCallStacks = findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth);
+    const resolvedDestCallAddr = __resolveAddr(destFuncAddr);
+
+    __println(`\nFound calls to ${resolvedDestCallAddr}:`);
+    for (const callStack of foundCallStacks) {
+        for (let i = 0; i < callStack.length; i++) {
+            __println(`${'| '.repeat(i)}|- ${callStack[i]}`);
+        }
+    }
+
+    __println("");
 }
 
 // ---------------------------------------------------------------------
