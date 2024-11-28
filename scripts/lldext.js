@@ -99,7 +99,7 @@ function readWideString(address, length = undefined) {
 }
 
 function __resolveAddr(addr) {
-    const rgx = /^\([a-f,\d]+/;
+    const rgx = /\([a-f,`,\d]+/;
     return dbgExec(`ln ${addr}`).First(line => rgx.test(line)).split('|')[0].trimEnd();
 }
 
@@ -118,12 +118,15 @@ function findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
         const immediateValue = operand.ImmediateValue;
         if (operand.Attributes.IsMemoryReference) {
             var elemSize = is64bit ? 8 : 4;
-            return host.memory.readMemoryValues(immediateValue, 1, elemSize, false)[0];
+            try {
+                return host.memory.readMemoryValues(immediateValue, 1, elemSize, false)[0];
+            } catch (err) {
+                __logn(ERROR, err);
+            }
         } else if (operand.Attributes.IsImmediate) {
             return immediateValue;
-        } else {
-            throw new Error("Unsupported attribute");
         }
+        return 0;
     }
 
     let callInstructions = disasm.DisassembleFunction(srcCallAddr).BasicBlocks.SelectMany(b => b.Instructions.Where(inst => inst.Attributes.IsCall));
@@ -131,7 +134,11 @@ function findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
     const callStack = [];
     for (const callInstruction of callInstructions) {
         var callTargetAddr = getTargetFunctionAddress(callInstruction.Operands[0]);
-        callStack.push([callTargetAddr, callInstruction.Address, 0]);
+        if (callTargetAddr) {
+            callStack.push([callTargetAddr, callInstruction.Address, 0]);
+        } else {
+            __logn(INFO, `Skipping call at ${callInstruction.Address} as it's impossible to decode its target.`);
+        }
     }
 
     const foundCallStacks = [];
@@ -173,7 +180,11 @@ function findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
             const callStackLength = callStack.length;
             for (const callInstruction of callInstructions) {
                 const callTargetAddr = getTargetFunctionAddress(callInstruction.Operands[0]);
-                callStack.push([callTargetAddr, callInstruction.Address, depth + 1]);
+                if (callTargetAddr) {
+                    callStack.push([callTargetAddr, callInstruction.Address, depth + 1]);
+                } else {
+                    __logn(INFO, `Skipping call at ${callInstruction.Address} as it's impossible to decode its target.`);
+                }
             }
             if (callStackLength == callStack.length) {
                 // no new calls added
