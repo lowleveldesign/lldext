@@ -7,12 +7,12 @@ LLDEXT - WinDbg helpers
 - [Native extension \(lldext.dll\)](#native-extension-lldextdll)
     - [!injectdll dllPath](#injectdll-dllpath)
 - [Helper functions \(lldext.js\)](#helper-functions-lldextjs)
-    - [readString/readWideString\(address, length = undefined\)](#readstringreadwidestringaddress-length-undefined)
+    - [readString/readWideString\(address, length\)](#readstringreadwidestringaddress-length)
     - [params32\(params64\)](#params32params64)
     - [dbgExec\(cmd\)](#dbgexeccmd)
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
-    - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth = 5\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth-5)
-    - [findAndPrintFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth = 5\)](#findandprintfunctioncallssrcfuncaddr-destfuncaddr-maxdepth-5)
+    - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
+    - [findAndPrintFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findandprintfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
     - [callstats\(functionNameOrAddress\) / TTD only](#callstatsfunctionnameoraddress-ttd-only)
     - [callstacks\(functionNameOrAddress\) / TTD only](#callstacksfunctionnameoraddress-ttd-only)
     - [seekAndGet\(objects, getTimePosition, func\) / TTD only](#seekandgetobjects-gettimeposition-func-ttd-only)
@@ -46,7 +46,9 @@ Helper functions (lldext.js)
 
 The scripts folder contains JavaScript scripts. The following commands / functions are available:
 
-### readString/readWideString(address, length = undefined)
+### readString/readWideString(address, length)
+
+*The length parameter is optional and defaults to undefined.*
 
 Reads an ANSI/UNICODE string from the specific address in the memory.
 
@@ -87,7 +89,9 @@ dx @$dbgExecAndPrint("r eax")
 # @$dbgExecAndPrint("r eax")
 ```
 
-### findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5)
+### findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth)
+
+*The maxDepth parameter is optional and defaults to 5.*
 
 Analyzes assembly code to find call paths between two functions. The **srcFuncAddr** parameter is the memory address of the source function to analyze, and the **destFuncAddr** is a memory address of the target function. The **maxDepth** defines the maximum call path length. It returns an array of call paths, each containnig an array of call addresses.
 
@@ -107,7 +111,9 @@ dx @$findFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
 #     [0x1]            : [(00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x589,(00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77]
 ```
 
-### findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5)
+### findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth)
+
+*The maxDepth parameter is optional and defaults to 5.*
 
 Similarly to findFunctionCalls finds call paths between two function, but instead of returning them, it prints the call paths in the output:
 
