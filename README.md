@@ -13,7 +13,7 @@ LLDEXT - WinDbg helpers
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
     - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
     - [findAndPrintFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findandprintfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
-    - [callstats\(functionNameOrAddress\) / TTD only](#callstatsfunctionnameoraddress-ttd-only)
+    - [callstats\(functionNameOrAddress\)](#callstatsfunctionnameoraddress)
     - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
     - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
     - [jumpTo\(timePosition\)](#jumptotimeposition)
@@ -127,9 +127,9 @@ dx @$findAndPrintFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
 # | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
 ```
 
-### callstats(functionNameOrAddress) / TTD only
+### callstats(functionNameOrAddress)
 
-It works with TTD traces and prints stats about calls of a given function or functions (wildcards and function addresses are supported), for example:
+It works with **TTD traces** and prints stats about calls of a given function or functions (wildcards and function addresses are supported), for example:
 
 ```shell
 dx -g @$callstats("kernelbase!*File*")
