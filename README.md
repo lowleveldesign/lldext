@@ -14,9 +14,9 @@ LLDEXT - WinDbg helpers
     - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
     - [findAndPrintFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findandprintfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
     - [callstats\(functionNameOrAddress\) / TTD only](#callstatsfunctionnameoraddress-ttd-only)
-    - [callstacks\(functionNameOrAddress\) / TTD only](#callstacksfunctionnameoraddress-ttd-only)
-    - [seekAndGet\(objects, getTimePosition, func\) / TTD only](#seekandgetobjects-gettimeposition-func-ttd-only)
-    - [jumpTo\(timePosition\) / TTD only](#jumptotimeposition-ttd-only)
+    - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
+    - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
+    - [jumpTo\(timePosition\)](#jumptotimeposition)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -156,9 +156,9 @@ dx -g @$callstats("kernelbase!*File*")
 # ==============================================================================================================================
 ```
 
-### callstacks(functionNameOrAddress) / TTD only
+### callstacks(functionNameOrAddress)
 
-It works with TTD traces and dumps a tree of callstacks that triggered a given function. Might be very slow for frequently called functions or when analysing long traces. Example usage:
+It works with **TTD traces** and dumps a tree of callstacks that triggered a given function. Might be very slow for frequently called functions or when analysing long traces. Example usage:
 
 ```shell
 dx @$callstacks("kernelbase!CreateFileW").print()
@@ -197,9 +197,9 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 #                                     |- ntdll!RtlUserThreadStart + 0x28 (0x7ff91e08aa48)
 ```
 
-### seekAndGet(objects, getTimePosition, func) / TTD only
+### seekAndGet(objects, getTimePosition, func)
 
-It works with TTD traces and executes a given function (func) for each object after setting the time position in the TTD trace. It returns the results of the function call. Example usages:
+It works with **TTD traces** and executes a given function (func) for each object after setting the time position in the TTD trace. It returns the results of the function call. Example usages:
 
 ```shell
 dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$curstack.Frames })
@@ -210,9 +210,9 @@ dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m
 dx -g @$seekAndGet(@$cursession.TTD.Calls("mshtml!CElement::put_outerHTML"), c => c.TimeStart, c => new { TimeStart = c.TimeStart, Class = **(void ***)(@$curthread.Registers.User.esp + 4) }).GroupBy(t => t.Class).Select(g => new { Class = g.Last().Class, LastCall = g.Last().TimeStart, Count = g.Count() })
 ```
 
-### jumpTo(timePosition) / TTD only
+### jumpTo(timePosition)
 
-Jumps to the time position in a TTD trace. Example usage:
+Jumps to the time position in a **TTD trace**. Example usage:
 
 ```shell
 dx @$jumpTo("6DDA9:B6C")
