@@ -17,6 +17,7 @@ LLDEXT - WinDbg helpers
     - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
     - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
     - [jumpTo\(timePosition\)](#jumptotimeposition)
+    - [tt\(timePosition\)](#tttimeposition)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -220,6 +221,30 @@ dx @$jumpTo("6DDA9:B6C")
 # (1d88.190c): Break instruction exception - code 80000003 (first/second chance not available)
 # Time Travel Position: 6DDA9:B6C
 # @$jumpTo("6DDA9:B6C")
+```
+
+### tt(timePosition)
+
+Creates a time position object (shorter version of `@$create("Debugger.Models.TTD.Position", ?, ?)`). Example usage:
+
+```shell
+dx @$tt("B6B47:48")
+
+# @$tt("B6B47:48")                 : B6B47:48 [Time Travel]
+#     Sequence         : 0xb6b47
+#     Steps            : 0x48
+#     SeekTo           [Method which seeks to time position]
+#     ToSystemTime     [Method which obtains the approximate system time at a given position]
+
+dx -g @$cursession.TTD.Memory(0x6da752c8, 0x6da752c8 + 10 * 4, "r").OrderBy(m => m.TimeStart).Where(m => m.TimeStart >= @$tt("B6AD3:270")).Select(m => new { TimeStart = m.TimeStart, TimeEnd = m.TimeEnd, Value = m.Value, Index = (int)(m.Address - 0x6da752c8) / 4 })
+
+# =====================================================================
+# =           = (+) TimeStart = (+) TimeEnd   = (+) Value     = Index =
+# =====================================================================
+# = [0x7]     - B6B47:48      - B6B47:48      - 0x6d8a52b0    - 6     =
+# = [0x8]     - B6D73:D3      - B6D73:D3      - 0x6d8a52b0    - 6     =
+# = [0x9]     - B6E0A:1BD     - B6E0A:1BD     - 0x6d8a52b0    - 6     =
+# = [0xa]     - B6E67:7EF     - B6E67:7EF     - 0x6d8a52b0    - 6     =
 ```
 
 Functions helping to recognize native controls/windows (windowing.js)

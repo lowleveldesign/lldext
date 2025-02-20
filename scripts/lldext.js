@@ -17,6 +17,7 @@ function initializeScript() {
         new host.functionAlias(dbgExecAndPrint, "dbgExecAndPrint"),
         new host.functionAlias(seekAndGet, "seekAndGet"),
         new host.functionAlias(jumpTo, "jumpTo"),
+        new host.functionAlias(tt, "tt"),
         new host.functionAlias(readString, "readString"),
         new host.functionAlias(readWideString, "readWideString"),
         new host.functionAlias(findFunctionCalls, "findFunctionCalls"),
@@ -241,6 +242,12 @@ function jumpTo(timePosition) {
     const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));
 
     host.createInstance("Debugger.Models.TTD.Position", seq, steps).SeekTo();
+}
+
+function tt(timePosition) {
+    const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));
+
+    return host.createInstance("Debugger.Models.TTD.Position", seq, steps);
 }
 
 // ---------------------------------------------------------------------
