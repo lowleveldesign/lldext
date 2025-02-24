@@ -17,7 +17,7 @@ LLDEXT - WinDbg helpers
     - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
     - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
     - [jumpTo\(timePosition\)](#jumptotimeposition)
-    - [tt\(timePosition\)](#tttimeposition)
+    - [timePos\(timePosition\)](#timepostimeposition)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -223,12 +223,12 @@ dx @$jumpTo("6DDA9:B6C")
 # @$jumpTo("6DDA9:B6C")
 ```
 
-### tt(timePosition)
+### timePos(timePosition)
 
 Creates a time position object (shorter version of `@$create("Debugger.Models.TTD.Position", ?, ?)`). Example usage:
 
 ```shell
-dx @$tt("B6B47:48")
+dx @$timePos("B6B47:48")
 
 # @$tt("B6B47:48")                 : B6B47:48 [Time Travel]
 #     Sequence         : 0xb6b47
@@ -236,7 +236,7 @@ dx @$tt("B6B47:48")
 #     SeekTo           [Method which seeks to time position]
 #     ToSystemTime     [Method which obtains the approximate system time at a given position]
 
-dx -g @$cursession.TTD.Memory(0x6da752c8, 0x6da752c8 + 10 * 4, "r").OrderBy(m => m.TimeStart).Where(m => m.TimeStart >= @$tt("B6AD3:270")).Select(m => new { TimeStart = m.TimeStart, TimeEnd = m.TimeEnd, Value = m.Value, Index = (int)(m.Address - 0x6da752c8) / 4 })
+dx -g @$cursession.TTD.Memory(0x6da752c8, 0x6da752c8 + 10 * 4, "r").OrderBy(m => m.TimeStart).Where(m => m.TimeStart >= @$timePos("B6AD3:270")).Select(m => new { TimeStart = m.TimeStart, TimeEnd = m.TimeEnd, Value = m.Value, Index = (int)(m.Address - 0x6da752c8) / 4 })
 
 # =====================================================================
 # =           = (+) TimeStart = (+) TimeEnd   = (+) Value     = Index =
