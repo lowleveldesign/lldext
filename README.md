@@ -18,6 +18,7 @@ LLDEXT - WinDbg helpers
     - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
     - [jumpTo\(timePosition\)](#jumptotimeposition)
     - [timePos\(timePosition\)](#timepostimeposition)
+    - [range\(start, end, step\)](#rangestart-end-step)
 - [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
@@ -245,6 +246,20 @@ dx -g @$cursession.TTD.Memory(0x6da752c8, 0x6da752c8 + 10 * 4, "r").OrderBy(m =>
 # = [0x8]     - B6D73:D3      - B6D73:D3      - 0x6d8a52b0    - 6     =
 # = [0x9]     - B6E0A:1BD     - B6E0A:1BD     - 0x6d8a52b0    - 6     =
 # = [0xa]     - B6E67:7EF     - B6E67:7EF     - 0x6d8a52b0    - 6     =
+```
+
+### range(start, end, step)
+
+Generates a sequence of numbers starting from *start* up to *end* with a step size of *step* (one by default). Example usage:
+
+```shell
+dx @$curprocess.TTD.Lifetime
+# @$curprocess.TTD.Lifetime                 : [FC:0, 33619E:0]
+#     MinPosition      : FC:0 [Time Travel]
+#     MaxPosition      : 33619E:0 [Time Travel]
+
+# dump managed stack for TTD trace positions, stepping by 10000 sequence numbers
+dx -r2 @$seekAndGet(@$range(0xfc, 0x33619E, 10000), seq => @$create("Debugger.Models.TTD.Position", seq, 0), seq => @$dbgExec("!clrstack"))
 ```
 
 Functions helping to recognize native controls/windows (windowing.js)

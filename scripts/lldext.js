@@ -15,11 +15,12 @@ function initializeScript() {
         new host.functionAlias(dbgEval, "dbgEval"),
         new host.functionAlias(dbgExec, "dbgExec"),
         new host.functionAlias(dbgExecAndPrint, "dbgExecAndPrint"),
+        new host.functionAlias(readString, "readString"),
+        new host.functionAlias(readWideString, "readWideString"),
+        new host.functionAlias(range, "range"),
         new host.functionAlias(seekAndGet, "seekAndGet"),
         new host.functionAlias(jumpTo, "jumpTo"),
         new host.functionAlias(timePos, "timePos"),
-        new host.functionAlias(readString, "readString"),
-        new host.functionAlias(readWideString, "readWideString"),
         new host.functionAlias(findFunctionCalls, "findFunctionCalls"),
         new host.functionAlias(findAndPrintFunctionCalls, "findAndPrintFunctionCalls"),
     ];
@@ -102,6 +103,13 @@ function readWideString(address, length = undefined) {
 function __resolveAddr(addr) {
     const rgx = /\([a-f,`,\d]+/;
     return dbgExec(`ln ${addr}`).First(line => rgx.test(line)).split('|')[0].trimEnd();
+}
+
+function* range(start, end, step = 1) {
+    while (start < end) {
+        yield start
+        start += step
+    }
 }
 
 // ---------------------------------------------------------------------
