@@ -9,25 +9,31 @@
 function initializeScript() {
     return [
         new host.apiVersionSupport(1, 7),
-        new host.functionAlias(callstacks, "callstacks"),
-        new host.functionAlias(callstats, "callstats"),
-        new host.functionAlias(params32, "params32"),
+
+        // Generic functions
         new host.functionAlias(dbgEval, "dbgEval"),
         new host.functionAlias(dbgExec, "dbgExec"),
         new host.functionAlias(dbgExecAndPrint, "dbgExecAndPrint"),
+        new host.functionAlias(findAndPrintFunctionCalls, "findAndPrintFunctionCalls"),
+        new host.functionAlias(findFunctionCalls, "findFunctionCalls"),
+        new host.functionAlias(params32, "params32"),
+        new host.functionAlias(range, "range"),
         new host.functionAlias(readString, "readString"),
         new host.functionAlias(readWideString, "readWideString"),
-        new host.functionAlias(range, "range"),
-        new host.functionAlias(seekAndGet, "seekAndGet"),
+
+        // TTD functions
+        new host.functionAlias(calls, "calls"),
+        new host.functionAlias(callstacks, "callstacks"),
+        new host.functionAlias(callstats, "callstats"),
         new host.functionAlias(jumpTo, "jumpTo"),
+        new host.functionAlias(seekAndGet, "seekAndGet"),
+        new host.functionAlias(seekTimeRangeAndGet, "seekTimeRangeAndGet"),
         new host.functionAlias(timePos, "timePos"),
-        new host.functionAlias(findFunctionCalls, "findFunctionCalls"),
-        new host.functionAlias(findAndPrintFunctionCalls, "findAndPrintFunctionCalls"),
     ];
 }
 
 // ---------------------------------------------------------------------
-// Some helper private methods
+// Private functions
 // ---------------------------------------------------------------------
 
 const VERBOSE = 0, INFO = 1, ERROR = 2, NONE = 10;
@@ -42,10 +48,6 @@ function __println(s) {
     host.diagnostics.debugLog(`${s}\n`);
 }
 
-function setLogLevel(lvl) {
-    logLevel = lvl;
-}
-
 function __log(lvl, s) {
     if (lvl >= logLevel) {
         host.diagnostics.debugLog(s);
@@ -53,7 +55,7 @@ function __log(lvl, s) {
 }
 
 function __logn(lvl, s) {
-    __log(lvl, s + "\n")
+    __log(lvl, s + "\n");
 }
 
 function __is64bit() {
@@ -66,8 +68,13 @@ function __assert(f, msg = "") {
     }
 }
 
+function __resolveAddr(addr) {
+    const rgx = /\([a-f,`,\d]+/;
+    return dbgExec(`ln ${addr}`).First(line => rgx.test(line)).split('|')[0].trimEnd();
+}
+
 // ---------------------------------------------------------------------
-// Helper functions to work with the debugger
+// Helper functions
 // ---------------------------------------------------------------------
 
 function dbgEval(v) {
@@ -92,29 +99,19 @@ function dbgExecAndPrint(s) {
     }
 }
 
-function readString(address, length = undefined) {
-    return length === undefined ? host.memory.readString(address) : host.memory.readString(address, length);
-}
+function findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
+    const foundCallStacks = findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth);
+    const resolvedDestCallAddr = __resolveAddr(destFuncAddr);
 
-function readWideString(address, length = undefined) {
-    return length === undefined ? host.memory.readWideString(address) : host.memory.readWideString(address, length);
-}
-
-function __resolveAddr(addr) {
-    const rgx = /\([a-f,`,\d]+/;
-    return dbgExec(`ln ${addr}`).First(line => rgx.test(line)).split('|')[0].trimEnd();
-}
-
-function* range(start, end, step = 1) {
-    while (start < end) {
-        yield start
-        start += step
+    __println(`\nFound calls to ${resolvedDestCallAddr}:`);
+    for (const callStack of foundCallStacks) {
+        for (let i = 0; i < callStack.length; i++) {
+            __println(`${'| '.repeat(i)}|- ${callStack[i]}`);
+        }
     }
-}
 
-// ---------------------------------------------------------------------
-// Helper functions to work with assembly
-// ---------------------------------------------------------------------
+    __println("");
+}
 
 function findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
     const srcCallAddr = host.parseInt64(srcFuncAddr, 16); // throws error if srcFuncAddrArg is not a valid Int64 number
@@ -208,69 +205,8 @@ function findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
     return foundCallStacks;
 }
 
-function findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth = 5) {
-    const foundCallStacks = findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth);
-    const resolvedDestCallAddr = __resolveAddr(destFuncAddr);
-
-    __println(`\nFound calls to ${resolvedDestCallAddr}:`);
-    for (const callStack of foundCallStacks) {
-        for (let i = 0; i < callStack.length; i++) {
-            __println(`${'| '.repeat(i)}|- ${callStack[i]}`);
-        }
-    }
-
-    __println("");
-}
-
-// ---------------------------------------------------------------------
-// Helper functions to work with the time-based debugging objects
-// ---------------------------------------------------------------------
-
-function seekAndGet(objects, getTimePosition, func) {
-    const objectsIter = objects[Symbol.iterator]();
-
-    const iter = {
-        next() {
-            const { value: obj, done } = objectsIter.next();
-            if (!done) {
-                const timePosition = getTimePosition(obj);
-                timePosition.SeekTo();
-                return { value: func(obj), done: false };
-            } else {
-                return { value: undefined, done: true };
-            }
-        },
-        [Symbol.iterator]() { return this; }
-    };
-    return iter;
-}
-
-
-function jumpTo(timePosition) {
-    const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));
-
-    host.createInstance("Debugger.Models.TTD.Position", seq, steps).SeekTo();
-}
-
-function timePos(timePosition) {
-    const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));
-
-    return host.createInstance("Debugger.Models.TTD.Position", seq, steps);
-}
-
-// ---------------------------------------------------------------------
-// Helper functions to work with calls recorded in the TTD log
-// ---------------------------------------------------------------------
-
-function callstats(functionNameOrAddress) {
-    return host.currentSession.TTD.Calls(functionNameOrAddress)
-        .GroupBy(c => c.Function === "" ? c.FunctionAddress.toString(16) : c.Function)
-        .Select(g => {
-            return {
-                Function: g.First().Function === "" ? g.First().FunctionAddress.toString(16) : g.First().Function,
-                Count: g.Count()
-            };
-        });
+function lldSetLogLevel(lvl) {
+    logLevel = lvl;
 }
 
 // Sometimes WinDbg incorrectly decodes the paramters as 64-bit values instead of 32-bit.
@@ -279,63 +215,84 @@ function params32(params64) {
     return params64.SelectMany(p => [p.getLowPart(), p.getHighPart()]);
 }
 
-// ---------------------------------------------------------------------
-// The callstacks function scans all the calls of a certain function
-// and builds a tree of all possible call stacks.
-// ---------------------------------------------------------------------
-
-class StackNode {
-
-    constructor(address, resolvedAddress) {
-        this.__address = address;
-        this.__resolvedAddress = resolvedAddress;
-        this.__parents = new Map(); // Map<address, StackNode>
-
-        this.__indent = "  ";
+function* range(start, end, step = 1) {
+    while (start < end) {
+        yield start;
+        start += step;
     }
-
-    index(frames) {
-        if (!frames.Any(_ => true)) {
-            return;
-        }
-        const functionFrame = frames.First();
-        const functionAddress = functionFrame.Attributes.InstructionOffset;
-        if (!this.__parents.has(functionAddress)) {
-            const parentNode = new StackNode(functionAddress, functionFrame.toString())
-            this.__parents.set(functionAddress, parentNode);
-        }
-        this.__parents.get(functionAddress).index(frames.Skip(1));
-    }
-
-    __printNode(nodeIndent) {
-        let indent = this.__indent.repeat(nodeIndent);
-        let s = `${indent}|- ${this.__resolvedAddress} (${this.__address})`;
-        for (const [addr, node] of this.__parents) {
-            s += `\r\n${node.__printNode(nodeIndent + 1)}`;
-        }
-        return s;
-    }
-
-    toString() {
-        return `${this.__resolvedAddress} (${this.__address})`;
-    }
-
-    print() {
-        let s = `${this.__resolvedAddress} (${this.__address})`;
-        for (const [addr, node] of this.__parents) {
-            s += `\r\n${node.__printNode(1)}`;
-        }
-        __logn(INFO, s);
-    }
-
-    get address() { return this.__address };
-
-    get functionName() { return this.__resolvedAddress; }
-
-    get parentNodes() { return this.__parents.values(); }
 }
 
+function readString(address, length = undefined) {
+    return length === undefined ? host.memory.readString(address) : host.memory.readString(address, length);
+}
+
+function readWideString(address, length = undefined) {
+    return length === undefined ? host.memory.readWideString(address) : host.memory.readWideString(address, length);
+}
+
+// ---------------------------------------------------------------------
+// TTD functions
+// ---------------------------------------------------------------------
+
+function calls(functionNameOrAddress) {
+    return host.currentSession.TTD.Calls(functionNameOrAddress);
+}
+
+// The callstacks function scans all the calls of a certain function
+// and builds a tree of all possible call stacks.
 function callstacks(functionNameOrAddress) {
+    class StackNode {
+
+        constructor(address, resolvedAddress) {
+            this.__address = address;
+            this.__resolvedAddress = resolvedAddress;
+            this.__parents = new Map(); // Map<address, StackNode>
+
+            this.__indent = "  ";
+        }
+
+        index(frames) {
+            if (!frames.Any(_ => true)) {
+                return;
+            }
+            const functionFrame = frames.First();
+            const functionAddress = functionFrame.Attributes.InstructionOffset;
+            if (!this.__parents.has(functionAddress)) {
+                const parentNode = new StackNode(functionAddress, functionFrame.toString())
+                this.__parents.set(functionAddress, parentNode);
+            }
+            this.__parents.get(functionAddress).index(frames.Skip(1));
+        }
+
+        __printNode(nodeIndent) {
+            let indent = this.__indent.repeat(nodeIndent);
+            let s = `${indent}|- ${this.__resolvedAddress} (${this.__address})`;
+            for (const [addr, node] of this.__parents) {
+                s += `\r\n${node.__printNode(nodeIndent + 1)}`;
+            }
+            return s;
+        }
+
+        toString() {
+            return `${this.__resolvedAddress} (${this.__address})`;
+        }
+
+        print() {
+            let s = `${this.__resolvedAddress} (${this.__address})`;
+            for (const [addr, node] of this.__parents) {
+                s += `\r\n${node.__printNode(1)}`;
+            }
+            __logn(INFO, s);
+        }
+
+        get address() { return this.__address };
+
+        get functionName() { return this.__resolvedAddress; }
+
+        get parentNodes() { return this.__parents.values(); }
+    }
+
+
     const callsTimes = host.currentSession.TTD.Calls(functionNameOrAddress)
         .Select(c => c.TimeStart);
 
@@ -355,4 +312,67 @@ function callstacks(functionNameOrAddress) {
     }
 
     return stackNode;
+}
+
+function callstats(calls) {
+    return calls.GroupBy(c => c.Function === "" ? c.FunctionAddress.toString(16) : c.Function)
+        .Select(g => {
+            return {
+                Function: g.First().Function === "" ? g.First().FunctionAddress.toString(16) : g.First().Function,
+                Count: g.Count()
+            };
+        });
+}
+
+function jumpTo(timePosition) {
+    const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));
+
+    host.createInstance("Debugger.Models.TTD.Position", seq, steps).SeekTo();
+}
+
+function seekAndGet(objects, getTimePosition, func) {
+    const objectsIter = objects[Symbol.iterator]()
+
+    const iter = {
+        next() {
+            const { value: obj, done } = objectsIter.next();
+            if (!done) {
+                const timePosition = getTimePosition(obj);
+                timePosition.SeekTo();
+                return { value: func(obj), done: false };
+            } else {
+                return { value: undefined, done: true };
+            }
+        },
+        [Symbol.iterator]() { return this; }
+    };
+    return iter;
+}
+
+function seekTimeRangeAndGet(objects, getStartTimePosition, getEndTimePosition, funcAtStart, funcAtEnd) {
+    const objectsIter = objects[Symbol.iterator]();
+
+    const iter = {
+        next() {
+            const { value: obj, done } = objectsIter.next();
+            if (!done) {
+                const startTimePos = getStartTimePosition(obj);
+                const endTimePos = getEndTimePosition(obj);
+                startTimePos.SeekTo();
+                const ctx = funcAtStart(obj);
+                endTimePos.SeekTo();
+                return { value: funcAtEnd(obj, ctx), done: false };
+            } else {
+                return { value: undefined, done: true };
+            }
+        },
+        [Symbol.iterator]() { return this; }
+    };
+    return iter;
+}
+
+function timePos(timePosition) {
+    const [seq, steps] = timePosition.toString().split(":", 2).map(s => parseInt(s, 16));
+
+    return host.createInstance("Debugger.Models.TTD.Position", seq, steps);
 }

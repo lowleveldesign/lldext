@@ -6,23 +6,27 @@ LLDEXT - WinDbg helpers
 - [Tutorials](#tutorials)
 - [Native extension \(lldext.dll\)](#native-extension-lldextdll)
     - [!injectdll dllPath](#injectdll-dllpath)
-- [Helper functions \(lldext.js\)](#helper-functions-lldextjs)
-    - [readString/readWideString\(address, length\)](#readstringreadwidestringaddress-length)
-    - [params32\(params64\)](#params32params64)
+- [Generic helper functions \(lldext.js\)](#generic-helper-functions-lldextjs)
+    - [dbgEval\(exp\)](#dbgevalexp)
     - [dbgExec\(cmd\)](#dbgexeccmd)
     - [dbgExecAndPrint\(cmd\)](#dbgexecandprintcmd)
-    - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
     - [findAndPrintFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findandprintfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
-    - [callstats\(functionNameOrAddress\)](#callstatsfunctionnameoraddress)
-    - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
-    - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
-    - [jumpTo\(timePosition\)](#jumptotimeposition)
-    - [timePos\(timePosition\)](#timepostimeposition)
+    - [findFunctionCalls\(srcFuncAddr, destFuncAddr, maxDepth\)](#findfunctioncallssrcfuncaddr-destfuncaddr-maxdepth)
+    - [params32\(params64\)](#params32params64)
     - [range\(start, end, step\)](#rangestart-end-step)
-- [Functions helping to recognize native controls/windows \(windowing.js\)](#functions-helping-to-recognize-native-controlswindows-windowingjs)
+    - [readString/readWideString\(address, length\)](#readstringreadwidestringaddress-length)
+- [TTD helper functions \(lldext.js\)](#ttd-helper-functions-lldextjs)
+    - [calls\(functionNameOrAddress\)](#callsfunctionnameoraddress)
+    - [callstacks\(functionNameOrAddress\)](#callstacksfunctionnameoraddress)
+    - [callstats\(calls\)](#callstatscalls)
+    - [jumpTo\(timePosition\)](#jumptotimeposition)
+    - [seekAndGet\(objects, getTimePosition, func\)](#seekandgetobjects-gettimeposition-func)
+    - [seekTimeRangeAndGet\(objects, getStartTimePosition, getEndTimePosition, funcAtStart, funcAtEnd\)](#seektimerangeandgetobjects-getstarttimeposition-getendtimeposition-funcatstart-funcatend)
+    - [timePos\(timePosition\)](#timepostimeposition)
+- [Functions to work with native controls/windows \(windowing.js\)](#functions-to-work-with-native-controlswindows-windowingjs)
+    - [findWindow\(hwnd\)](#findwindowhwnd)
     - [loadSpyxxTree\(path\)](#loadspyxxtreepath)
     - [loadSystemInformerTree\(path\)](#loadsysteminformertreepath)
-    - [findWindow\(hwnd\)](#findwindowhwnd)
 
 <!-- /MarkdownTOC -->
 
@@ -31,7 +35,7 @@ Tutorials
 
 My materials covering WinDbg and lldext:
 
-- [WinDbg usage guide](https://wtrace.net/guides/using-windbg/) at <https://wtrace.net>
+- [WinDbg usage guide](https://wtrace.net/guides/windbg/) at <https://wtrace.net>
 - :movie_camera: [Debugging user32 window functions in WinDbg with JavaScript automation](https://youtu.be/lupFi5n7iJk?feature=shared)
 
 Native extension (lldext.dll)
@@ -43,31 +47,17 @@ Injects DLL into the debuggee
 
 Current version can be found under the release tab - use version corresponding to the bitness of the debuggee.
 
-Helper functions (lldext.js)
-----------------------------
+Generic helper functions (lldext.js)
+-----------------------------
 
-The scripts folder contains JavaScript scripts. The following commands / functions are available:
+### dbgEval(exp)
 
-### readString/readWideString(address, length)
-
-*The length parameter is optional and defaults to undefined.*
-
-Reads an ANSI/UNICODE string from the specific address in the memory.
+Evaluates a debugger expression. Example usage:
 
 ```shell
-dx -g @$seekAndGet(@$cursession.TTD.Calls("jvm!SystemDictionary::resolve_instance_class_or_null").Skip(0x8a0), c => c.TimeStart, c => new { TimeStart = c.TimeStart, ClassName = @$readString(c.Parameters.class_name->_body, c.Parameters.class_name->_length) })
-
-# ======================================================================================
-# =           = (+) TimeStart = ClassName                                              =
-# ======================================================================================
-# = [0x0]     - 69C72:269     - java/util/concurrent/CopyOnWriteArrayList              =
-# = [0x1]     - 6A31D:4F2     - java/lang/Object                                       =
-# = [0x2]     - 6A333:A1A     - java/util/concurrent/CopyOnWriteArrayList              =
+dx @$dbgEval("sizeof(void*)")
+# @$dbgEval("sizeof(void*)") : 0x4
 ```
-
-### params32(params64)
-
-This function might be useful if WinDbg incorrectly decodes the parameters as 64-bit integers while the target is 32-bit. It sporadically happens when we lack private symbols.
 
 ### dbgExec(cmd)
 
@@ -89,6 +79,22 @@ dx @$dbgExecAndPrint("r eax")
 
 # eax=0019715c
 # @$dbgExecAndPrint("r eax")
+```
+
+### findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth)
+
+*The maxDepth parameter is optional and defaults to 5.*
+
+Similarly to findFunctionCalls finds call paths between two function, but instead of returning them, it prints the call paths in the output:
+
+```shell
+dx @$findAndPrintFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
+#
+# Found calls to (00007ffe`520f0c60)   ntdll!NtCreateFile:
+# |- (00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x5f8
+# | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
+# |- (00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x589
+# | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
 ```
 
 ### findFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth)
@@ -113,54 +119,62 @@ dx @$findFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
 #     [0x1]            : [(00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x589,(00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77]
 ```
 
-### findAndPrintFunctionCalls(srcFuncAddr, destFuncAddr, maxDepth)
+### params32(params64)
 
-*The maxDepth parameter is optional and defaults to 5.*
+This function might be useful if WinDbg incorrectly decodes the parameters as 64-bit integers while the target is 32-bit. It sporadically happens when we lack private symbols.
 
-Similarly to findFunctionCalls finds call paths between two function, but instead of returning them, it prints the call paths in the output:
+### range(start, end, step)
+
+Generates a sequence of numbers starting from *start* up to *end* with a step size of *step* (one by default). Example usage:
 
 ```shell
-dx @$findAndPrintFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
-#
-# Found calls to (00007ffe`520f0c60)   ntdll!NtCreateFile:
-# |- (00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x5f8
-# | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
-# |- (00007ffe`4f379fc0)   KERNELBASE!CreateFileInternal+0x589
-# | |- (00007ffe`4f379e40)   KERNELBASE!CreateFileW+0x77
+dx @$curprocess.TTD.Lifetime
+# @$curprocess.TTD.Lifetime                 : [FC:0, 33619E:0]
+#     MinPosition      : FC:0 [Time Travel]
+#     MaxPosition      : 33619E:0 [Time Travel]
+
+# dump managed stack for TTD trace positions, stepping by 10000 sequence numbers
+dx -r2 @$seekAndGet(@$range(0xfc, 0x33619E, 10000), seq => @$create("Debugger.Models.TTD.Position", seq, 0), seq => @$dbgExec("!clrstack"))
 ```
 
-### callstats(functionNameOrAddress)
+### readString/readWideString(address, length)
 
-It works with **TTD traces** and prints stats about calls of a given function or functions (wildcards and function addresses are supported), for example:
+*The length parameter is optional and defaults to undefined.*
+
+Reads an ANSI/UNICODE string from the specific address in the memory.
 
 ```shell
-dx -g @$callstats("kernelbase!*File*")
+dx -g @$seekAndGet(@$cursession.TTD.Calls("jvm!SystemDictionary::resolve_instance_class_or_null").Skip(0x8a0), c => c.TimeStart, c => new { TimeStart = c.TimeStart, ClassName = @$readString(c.Parameters.class_name->_body, c.Parameters.class_name->_length) })
 
-# ==============================================================================================================================
-# =                                                              = Function                                          = Count   =
-# ==============================================================================================================================
-# = ["KERNELBASE!GetModuleFileNameW"] : [object Object]          - KERNELBASE!GetModuleFileNameW                     - 0x13    =
-# = ["KERNELBASE!GetFileAttributesExW"] : [object Object]        - KERNELBASE!GetFileAttributesExW                   - 0x23    =
-# = ["KERNELBASE!IsBrokeredSetFileAttributesWPresent"] : [obj... - KERNELBASE!IsBrokeredSetFileAttributesWPresent    - 0x8     =
-# = ["KERNELBASE!FindFirstFileExW"] : [object Object]            - KERNELBASE!FindFirstFileExW                       - 0x2     =
-# = ["KERNELBASE!InternalFindFirstFileExW"] : [object Object]    - KERNELBASE!InternalFindFirstFileExW               - 0x2     =
-# = ["KERNELBASE!BasepInitializeFindFileHandle"] : [object Ob... - KERNELBASE!BasepInitializeFindFileHandle          - 0x2     =
-# = ["KERNELBASE!CloseEncryptedFileRaw"] : [object Object]       - KERNELBASE!CloseEncryptedFileRaw                  - 0x17    =
-# = ["KERNELBASE!GetFileType"] : [object Object]                 - KERNELBASE!GetFileType                            - 0x6     =
-# = ["KERNELBASE!ReadFile"] : [object Object]                    - KERNELBASE!ReadFile                               - 0x1f    =
-# = ["KERNELBASE!PathCchRemoveFileSpec"] : [object Object]       - KERNELBASE!PathCchRemoveFileSpec                  - 0x1     =
-# = ["KERNELBASE!CreateFileMappingNumaW"] : [object Object]      - KERNELBASE!CreateFileMappingNumaW                 - 0x9     =
-# = ["KERNELBASE!MapViewOfFileExNuma"] : [object Object]         - KERNELBASE!MapViewOfFileExNuma                    - 0x53    =
-# = ["KERNELBASE!UnmapViewOfFile"] : [object Object]             - KERNELBASE!UnmapViewOfFile                        - 0x24    =
-# = ["KERNELBASE!WriteFile"] : [object Object]                   - KERNELBASE!WriteFile                              - 0x9     =
-# = ["KERNELBASE!BasepLoadLibraryAsDataFileInternal"] : [obje... - KERNELBASE!BasepLoadLibraryAsDataFileInternal     - 0x5     =
-# = ["KERNELBASE!BasepReleaseDataFileHandle"] : [object Object]  - KERNELBASE!BasepReleaseDataFileHandle             - 0x5     =
-# ==============================================================================================================================
+# ======================================================================================
+# =           = (+) TimeStart = ClassName                                              =
+# ======================================================================================
+# = [0x0]     - 69C72:269     - java/util/concurrent/CopyOnWriteArrayList              =
+# = [0x1]     - 6A31D:4F2     - java/lang/Object                                       =
+# = [0x2]     - 6A333:A1A     - java/util/concurrent/CopyOnWriteArrayList              =
+```
+
+TTD helper functions (lldext.js)
+--------------------------------
+
+### calls(functionNameOrAddress)
+
+It is basically an alias for `@$currentSession.TTD.Calls`. Example usage:
+
+```shell
+dx -g @$calls("advapi32!RegQueryValueEx*").Take(2).Select(c => new { TimeStart = c.TimeStart, Function = c.Function, hKey = c.Parameters[0] })
+
+# ===========================================================================
+# =          = (+) TimeStart = (+) Function                     = hKey      =
+# ===========================================================================
+# = [0x0]    - 633:EDA       - ADVAPI32!RegQueryValueExWStub    - 0x181c    =
+# = [0x1]    - 64E:1A99      - ADVAPI32!RegQueryValueExWStub    - 0x1dd4    =
+# ===========================================================================
 ```
 
 ### callstacks(functionNameOrAddress)
 
-It works with **TTD traces** and dumps a tree of callstacks that triggered a given function. Might be very slow for frequently called functions or when analysing long traces. Example usage:
+It dumps a tree of callstacks that triggered a given function. Might be very slow for frequently called functions or when analysing long traces. Example usage:
 
 ```shell
 dx @$callstacks("kernelbase!CreateFileW").print()
@@ -199,17 +213,42 @@ dx @$callstacks("kernelbase!CreateFileW").print()
 #                                     |- ntdll!RtlUserThreadStart + 0x28 (0x7ff91e08aa48)
 ```
 
-### seekAndGet(objects, getTimePosition, func)
+### callstats(calls)
 
-It works with **TTD traces** and executes a given function (func) for each object after setting the time position in the TTD trace. It returns the results of the function call. Example usages:
+It prints stats about calls of a given function or functions (wildcards and function addresses are supported), for example:
 
 ```shell
-dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$curstack.Frames })
+dx -g @$callstats(@$calls("kernelbase!*File*"))
 
-dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$dbgExec("k") })
+# ==============================================================================================================================
+# =                                                              = Function                                          = Count   =
+# ==============================================================================================================================
+# = ["KERNELBASE!GetModuleFileNameW"] : [object Object]          - KERNELBASE!GetModuleFileNameW                     - 0x13    =
+# = ["KERNELBASE!GetFileAttributesExW"] : [object Object]        - KERNELBASE!GetFileAttributesExW                   - 0x23    =
+# = ["KERNELBASE!IsBrokeredSetFileAttributesWPresent"] : [obj... - KERNELBASE!IsBrokeredSetFileAttributesWPresent    - 0x8     =
+# = ["KERNELBASE!FindFirstFileExW"] : [object Object]            - KERNELBASE!FindFirstFileExW                       - 0x2     =
+# = ["KERNELBASE!InternalFindFirstFileExW"] : [object Object]    - KERNELBASE!InternalFindFirstFileExW               - 0x2     =
+# = ["KERNELBASE!BasepInitializeFindFileHandle"] : [object Ob... - KERNELBASE!BasepInitializeFindFileHandle          - 0x2     =
+# = ["KERNELBASE!CloseEncryptedFileRaw"] : [object Object]       - KERNELBASE!CloseEncryptedFileRaw                  - 0x17    =
+# = ["KERNELBASE!GetFileType"] : [object Object]                 - KERNELBASE!GetFileType                            - 0x6     =
+# = ["KERNELBASE!ReadFile"] : [object Object]                    - KERNELBASE!ReadFile                               - 0x1f    =
+# = ["KERNELBASE!PathCchRemoveFileSpec"] : [object Object]       - KERNELBASE!PathCchRemoveFileSpec                  - 0x1     =
+# = ["KERNELBASE!CreateFileMappingNumaW"] : [object Object]      - KERNELBASE!CreateFileMappingNumaW                 - 0x9     =
+# = ["KERNELBASE!MapViewOfFileExNuma"] : [object Object]         - KERNELBASE!MapViewOfFileExNuma                    - 0x53    =
+# = ["KERNELBASE!UnmapViewOfFile"] : [object Object]             - KERNELBASE!UnmapViewOfFile                        - 0x24    =
+# = ["KERNELBASE!WriteFile"] : [object Object]                   - KERNELBASE!WriteFile                              - 0x9     =
+# = ["KERNELBASE!BasepLoadLibraryAsDataFileInternal"] : [obje... - KERNELBASE!BasepLoadLibraryAsDataFileInternal     - 0x5     =
+# = ["KERNELBASE!BasepReleaseDataFileHandle"] : [object Object]  - KERNELBASE!BasepReleaseDataFileHandle             - 0x5     =
+# ==============================================================================================================================
 
-# group calls to outerHTML property by a given COM class instance
-dx -g @$seekAndGet(@$cursession.TTD.Calls("mshtml!CElement::put_outerHTML"), c => c.TimeStart, c => new { TimeStart = c.TimeStart, Class = **(void ***)(@$curthread.Registers.User.esp + 4) }).GroupBy(t => t.Class).Select(g => new { Class = g.Last().Class, LastCall = g.Last().TimeStart, Count = g.Count() })
+dx -g @$callstats(@$cursession.TTD.Calls("advapi32!Reg*").Where(c => c.TimeStart >= @$timePos("26E269:225B") && c.TimeEnd <= @$timePos("26F4DE:80E")))
+# ====================================================================================================
+# =                                                     = Function                         = Count   =
+# ====================================================================================================
+# = ["ADVAPI32!RegOpenKeyExWStub"] : [object Object]    - ADVAPI32!RegOpenKeyExWStub       - 0x16    =
+# = ["ADVAPI32!RegCloseKeyStub"] : [object Object]      - ADVAPI32!RegCloseKeyStub         - 0x8     =
+# = ["ADVAPI32!RegQueryValueExWStub"] : [object Object] - ADVAPI32!RegQueryValueExWStub    - 0x3     =
+# ====================================================================================================
 ```
 
 ### jumpTo(timePosition)
@@ -222,6 +261,34 @@ dx @$jumpTo("6DDA9:B6C")
 # (1d88.190c): Break instruction exception - code 80000003 (first/second chance not available)
 # Time Travel Position: 6DDA9:B6C
 # @$jumpTo("6DDA9:B6C")
+```
+
+### seekAndGet(objects, getTimePosition, func)
+
+It executes a given function (func) for each object after setting the time position in the TTD trace. It returns the results of the function call. Example usages:
+
+```shell
+dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$curstack.Frames })
+
+dx -r3 @$seekAndGet(@$cursession.TTD.Memory(0x16a078c0, 0x16a078c4, "w"), m => m.TimeStart, m => new { OldValue = m.OverwrittenValue, NewValue = m.Value, Stack = @$dbgExec("k") })
+
+# group calls to outerHTML property by a given COM class instance
+dx -g @$seekAndGet(@$cursession.TTD.Calls("mshtml!CElement::put_outerHTML"), c => c.TimeStart, c => new { TimeStart = c.TimeStart, Class = **(void ***)(@$curthread.Registers.User.esp + 4) }).GroupBy(t => t.Class).Select(g => new { Class = g.Last().Class, LastCall = g.Last().TimeStart, Count = g.Count() })
+```
+
+### seekTimeRangeAndGet(objects, getStartTimePosition, getEndTimePosition, funcAtStart, funcAtEnd)
+
+For each object in the objects list, it seeks the start time position and executes funcAtStart, saving its result. Then it seeks the end time position and executes the funcAtEnd function. This function is useful when, for example, a function returns a result in an output parameter. We can save the parameter address in the context returned from the funcAtStart and use it in funcAtEnd. Example usage:
+
+```shell
+dx -g @$seekTimeRangeAndGet(@$cursession.TTD.Calls("ADVAPI32!RegOpenKeyExWStub").Take(2), c => c.TimeStart, c => c.TimeEnd, c => new { phkResultAddr = *(void ***)(@esp + 0x14) }, (c, ctx) => new { TimeStart = c.TimeStart, Result = (void *)(int)c.ReturnValue, hKey = @$params32(c.Parameters)[0], lpSubKey = (wchar_t *)@$params32(c.Parameters)[1], phkResult = c.ReturnValue == 0 ? *ctx.phkResultAddr : 0 })
+
+# ================================================================================================================================
+# =          = (+) TimeStart = Result = hKey          = (+) lpSubKey                                                 = phkResult =
+# ================================================================================================================================
+# = [0x0]    - 2E4:70D       - 0x2    - 0x304         - 0x3a8c970 : "Policies\Microsoft\Office\16.0\Common\Roaming"  - 0         =
+# = [0x1]    - 36E:534       - 0x5    - 0x30c         - 0x3a8c998 : "16.0\Common\Roaming"                            - 0         =
+# ================================================================================================================================
 ```
 
 ### timePos(timePosition)
@@ -248,22 +315,29 @@ dx -g @$cursession.TTD.Memory(0x6da752c8, 0x6da752c8 + 10 * 4, "r").OrderBy(m =>
 # = [0xa]     - B6E67:7EF     - B6E67:7EF     - 0x6d8a52b0    - 6     =
 ```
 
-### range(start, end, step)
+Functions to work with native controls/windows (windowing.js)
+-------------------------------------------------------------
 
-Generates a sequence of numbers starting from *start* up to *end* with a step size of *step* (one by default). Example usage:
+### findWindow(hwnd)
+
+Retrieves information about a window from a previously loaded Spyxx tree. Example usages:
 
 ```shell
-dx @$curprocess.TTD.Lifetime
-# @$curprocess.TTD.Lifetime                 : [FC:0, 33619E:0]
-#     MinPosition      : FC:0 [Time Travel]
-#     MaxPosition      : 33619E:0 [Time Travel]
+.scriptload windowing.js
 
-# dump managed stack for TTD trace positions, stepping by 10000 sequence numbers
-dx -r2 @$seekAndGet(@$range(0xfc, 0x33619E, 10000), seq => @$create("Debugger.Models.TTD.Position", seq, 0), seq => @$dbgExec("!clrstack"))
+dx -g @$cursession.TTD.Calls("patcher!hooked_SetWindowPos").Select(c => new { HWND = c.Parameters.window_handle, Class = @$scriptContents.findWindow(c.Parameters.window_handle).className, Cx = c.Parameters.cx, Cy = c.Parameters.cy, TimeStart = c.TimeStart, Time = c.SystemTimeStart })
+# ================================================================================================================================================
+# =                    = (+) HWND    = Class                       = Cx      = Cy     = (+) TimeStart = (+) Time                                 =
+# ================================================================================================================================================
+# = [0x0]              - 0x160046    - tooltips_class32            - 1536    - 813    - 676:55        - Wednesday, March 6, 2024 14:14:15.318    =
+# = [0x1]              - 0x160046    - tooltips_class32            - 0       - 0      - 682:55        - Wednesday, March 6, 2024 14:14:15.318    =
+# = [0x2]              - 0x160046    - tooltips_class32            - 0       - 0      - 2333:253      - Wednesday, March 6, 2024 14:14:19.662    =
+...
+``` 
+
+```shell
+bp user32!NtUserSetWindowPos "dx new { function = \"SetWindowPos\", hWnd = (void *)@rcx, class = @$findWindow(@rcx).className, hWndInsertAfter = (void *)@rdx, X = (int)@r8, Y = (int)@r9, cx = *(int *)(@rsp+0x28), cy = *(int *)(@rsp+0x30), uFlags = *(unsigned int *)(@rsp+0x38) }; g"
 ```
-
-Functions helping to recognize native controls/windows (windowing.js)
----------------------------------------------------------------------
 
 ### loadSpyxxTree(path)
 
@@ -304,25 +378,4 @@ CicMarshalWndClass, 0x120442, CicMarshalWnd, iexplore.exe (18168): unnamed threa
 Isolation Thread Message Window, 0xa01b8, , iexplore.exe (18168): unnamed thread (2824), iexplore.exe
 Isolation Thread Message Window, 0x3068c, , iexplore.exe (18168): unnamed thread (16852), iexplore.exe
 OleMainThreadWndClass, 0x805b6, OleMainThreadWndName, iexplore.exe (18168): unnamed thread (16852), combase.dll
-```
-
-### findWindow(hwnd)
-
-Retrieves information about a window from a previously loaded Spyxx tree. Example usages:
-
-```shell
-.scriptload windowing.js
-
-dx -g @$cursession.TTD.Calls("patcher!hooked_SetWindowPos").Select(c => new { HWND = c.Parameters.window_handle, Class = @$scriptContents.findWindow(c.Parameters.window_handle).className, Cx = c.Parameters.cx, Cy = c.Parameters.cy, TimeStart = c.TimeStart, Time = c.SystemTimeStart })
-# ================================================================================================================================================
-# =                    = (+) HWND    = Class                       = Cx      = Cy     = (+) TimeStart = (+) Time                                 =
-# ================================================================================================================================================
-# = [0x0]              - 0x160046    - tooltips_class32            - 1536    - 813    - 676:55        - Wednesday, March 6, 2024 14:14:15.318    =
-# = [0x1]              - 0x160046    - tooltips_class32            - 0       - 0      - 682:55        - Wednesday, March 6, 2024 14:14:15.318    =
-# = [0x2]              - 0x160046    - tooltips_class32            - 0       - 0      - 2333:253      - Wednesday, March 6, 2024 14:14:19.662    =
-...
-``` 
-
-```shell
-bp user32!NtUserSetWindowPos "dx new { function = \"SetWindowPos\", hWnd = (void *)@rcx, class = @$findWindow(@rcx).className, hWndInsertAfter = (void *)@rdx, X = (int)@r8, Y = (int)@r9, cx = *(int *)(@rsp+0x28), cy = *(int *)(@rsp+0x30), uFlags = *(unsigned int *)(@rsp+0x38) }; g"
 ```
