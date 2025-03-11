@@ -121,7 +121,11 @@ dx @$findFunctionCalls(0x7ffe4f379e40, 0x7ffe520f0c60, 3)
 
 ### params32(params64)
 
-This function might be useful if WinDbg incorrectly decodes the parameters as 64-bit integers while the target is 32-bit. It sporadically happens when we lack private symbols.
+This function might be useful if WinDbg incorrectly decodes the parameters as 64-bit integers while the target is 32-bit. It sporadically happens when we lack private symbols. Below is an example of code when the debugger incorrectly discovered the TTD trace bitness and I needed to fix it for both Parameters and ReturnValue proprties:
+
+```shell
+dx -g @$seekAndGet(@$cursession.TTD.Calls(0x645a0f01), ev => ev.TimeStart, ev => new { Time = ev.TimeStart, Result = (void *)(int)ev.ReturnValue, Data = *(wchar_t **)(@$params32(ev.Parameters)[1] + 4) + 4 })
+```
 
 ### range(start, end, step)
 
