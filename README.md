@@ -36,7 +36,8 @@ Tutorials
 My materials covering WinDbg and lldext:
 
 - [WinDbg usage guide](https://wtrace.net/guides/windbg/) at <https://wtrace.net>
-- :movie_camera: [Debugging user32 window functions in WinDbg with JavaScript automation](https://youtu.be/lupFi5n7iJk?feature=shared)
+- :movie_camera: [Debugging user32 window functions in WinDbg with JavaScript automation](https://youtu.be/lupFi5n7iJk)
+- :movie_camera: [Analyzing function calls from a TTD trace in WinDbg](https://youtu.be/7zI6Fp6uBuk)
 
 Native extension (lldext.dll)
 -----------------------------
